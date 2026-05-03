@@ -6,6 +6,9 @@
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { Line2 } from 'three/examples/jsm/lines/Line2.js';
+import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
+import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js';
 import { useChessStore } from '../../store/chessStore';
 import { PIECES, type PieceType } from '../../logic/chess/constants';
 
@@ -21,6 +24,7 @@ let boardGroup: THREE.Group;
 let piecesGroup: THREE.Group;
 let raycaster: THREE.Raycaster;
 let mouse: THREE.Vector2;
+let lineMaterials: LineMaterial[] = []; // 存储所有 LineMaterial，用于更新分辨率
 
 // 棋盘尺寸配置
 const BOARD_WIDTH = 9;
@@ -97,9 +101,48 @@ function setupLights() {
 }
 
 /**
+ * 创建粗线（使用 Line2）
+ * @param points - 线的顶点数组
+ * @param color - 线的颜色
+ * @param lineWidth - 线的宽度（像素）
+ */
+function createThickLine(points: THREE.Vector3[], color: number, lineWidth: number): Line2 {
+  // 将点转化为扁平数组 [x1, y1, z1, x2, y2, z2, ...]
+  const positions: number[] = [];
+  points.forEach(p => positions.push(p.x, p.y, p.z));
+
+  // 创建 LineGeometry
+  const geometry = new LineGeometry();
+  geometry.setPositions(positions);
+
+  // 创建 LineMaterial
+  const material = new LineMaterial({
+    color: color,
+    linewidth: lineWidth,
+    resolution: new THREE.Vector2(
+      container.value?.clientWidth || window.innerWidth,
+      container.value?.clientHeight || window.innerHeight
+    ),
+    dashed: false
+  });
+
+  // 存储材质引用，用于窗口大小改变时更新分辨率
+  lineMaterials.push(material);
+
+  // 创建 Line2
+  const line = new Line2(geometry, material);
+  line.computeLineDistances(); // 必须调用，否则线条不可见
+  
+  return line;
+}
+
+/**
  * 创建棋盘
  */
 function createBoard() {
+  // 清空之前的 LineMaterial 引用
+  lineMaterials = [];
+  
   boardGroup = new THREE.Group();
 
   // 棋盘底座尺寸计算
@@ -252,8 +295,8 @@ function drawBoardLines() {
  * 绘制兵、卒、炮位置的位标
  */
 function drawPieceMarkers(startX: number, startZ: number) {
-  const markerMaterial = new THREE.LineBasicMaterial({ color: 0x000000 });
   const markerSize = 0.15; // 位标拐线长度
+  const markerLineWidth = 2; // 位标线宽（像素）
 
   // 定义需要绘制位标的位置（col, row）
   const markerPositions = [
@@ -278,8 +321,7 @@ function drawPieceMarkers(startX: number, startZ: number) {
         new THREE.Vector3(x - markerSize / 2, 0.01, z - markerSize / 2),
         new THREE.Vector3(x - markerSize / 2, 0.01, z - markerSize),
       ];
-      const leftTopGeometry = new THREE.BufferGeometry().setFromPoints(leftTopPoints);
-      const leftTopLine = new THREE.Line(leftTopGeometry, markerMaterial);
+      const leftTopLine = createThickLine(leftTopPoints, 0x000000, markerLineWidth);
       boardGroup.add(leftTopLine);
     }
 
@@ -290,8 +332,7 @@ function drawPieceMarkers(startX: number, startZ: number) {
         new THREE.Vector3(x + markerSize / 2, 0.01, z - markerSize / 2),
         new THREE.Vector3(x + markerSize, 0.01, z - markerSize / 2),
       ];
-      const rightTopGeometry = new THREE.BufferGeometry().setFromPoints(rightTopPoints);
-      const rightTopLine = new THREE.Line(rightTopGeometry, markerMaterial);
+      const rightTopLine = createThickLine(rightTopPoints, 0x000000, markerLineWidth);
       boardGroup.add(rightTopLine);
     }
 
@@ -302,8 +343,7 @@ function drawPieceMarkers(startX: number, startZ: number) {
         new THREE.Vector3(x - markerSize / 2, 0.01, z + markerSize / 2),
         new THREE.Vector3(x - markerSize / 2, 0.01, z + markerSize),
       ];
-      const leftBottomGeometry = new THREE.BufferGeometry().setFromPoints(leftBottomPoints);
-      const leftBottomLine = new THREE.Line(leftBottomGeometry, markerMaterial);
+      const leftBottomLine = createThickLine(leftBottomPoints, 0x000000, markerLineWidth);
       boardGroup.add(leftBottomLine);
     }
 
@@ -314,8 +354,7 @@ function drawPieceMarkers(startX: number, startZ: number) {
         new THREE.Vector3(x + markerSize / 2, 0.01, z + markerSize / 2),
         new THREE.Vector3(x + markerSize, 0.01, z + markerSize / 2),
       ];
-      const rightBottomGeometry = new THREE.BufferGeometry().setFromPoints(rightBottomPoints);
-      const rightBottomLine = new THREE.Line(rightBottomGeometry, markerMaterial);
+      const rightBottomLine = createThickLine(rightBottomPoints, 0x000000, markerLineWidth);
       boardGroup.add(rightBottomLine);
     }
   });
@@ -578,6 +617,11 @@ function onWindowResize() {
   camera.aspect = width / height;
   camera.updateProjectionMatrix();
   renderer.setSize(width, height);
+  
+  // 更新所有 LineMaterial 的分辨率
+  lineMaterials.forEach(material => {
+    material.resolution.set(width, height);
+  });
 }
 
 // 生命周期钩子
