@@ -15,10 +15,11 @@ import { Line2 } from 'three/examples/jsm/lines/Line2.js';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js';
 import { useChessStore } from '../../store/chessStore';
-import { PIECES, type PieceType, type Board } from '../../logic/chess/constants';
+import { PIECES, type PieceType, type Board, UCIToMove } from '../../logic/chess/constants';
 import { isValidMove, isInCheck } from '../../logic/chess/rules';
 import checkImage from '../../assets/将军.png';
 import checkmateImage from '../../assets/绝杀.png';
+import { startEngine, getBestMove } from '../../services/engineService';
 
 const container = ref<HTMLDivElement | null>(null);
 const chessStore = useChessStore();
@@ -27,6 +28,10 @@ const chessStore = useChessStore();
 const showCheckAlert = ref(false);
 const alertImage = ref('');
 let alertTimer: number | null = null;
+
+// AI 引擎相关状态
+const isAIThinking = ref(false); // AI 是否正在思考
+let engineStarted = false; // 引擎是否已启动
 
 // Three.js 相关变量
 let scene: THREE.Scene;
@@ -448,7 +453,7 @@ function createPieces() {
         
         const uniqueId = `${key}${pieceCounter[key]}`; // 例如：黑卒1、红兵1
         
-        pieceMesh.userData = { 
+        (pieceMesh as any).userData = { 
           row, 
           col, 
           piece,
@@ -599,12 +604,12 @@ function onMouseDown(event: MouseEvent) {
     const selectedObject = intersects[0].object as THREE.Mesh;
     
     // 检查是否是死子（被吃掉的棋子不能再移动）
-    if (selectedObject.userData.isCaptured) {
+    if ((selectedObject as any).userData.isCaptured) {
       return; // 死子不能拖动
     }
     
     // 检查是否是当前行棋方的棋子
-    const { row, col, piece } = selectedObject.userData;
+    const { row, col, piece } = (selectedObject as any).userData;
     const pieceColor = piece > 0 ? 'red' : 'black';
     
     if (pieceColor === chessStore.currentPlayer) {
@@ -682,8 +687,8 @@ function onMouseUp(event: MouseEvent) {
     const toRow = Math.round((intersectPoint.z - startZ) / CELL_SIZE);
     
     // 获取起始位置
-    const fromRow = draggedPiece.userData.row;
-    const fromCol = draggedPiece.userData.col;
+    const fromRow = (draggedPiece as any).userData.row;
+    const fromCol = (draggedPiece as any).userData.col;
     
     // 验证移动是否合法
     if (validateMove(fromRow, fromCol, toRow, toCol)) {
@@ -733,7 +738,7 @@ function executeMove(fromRow: number, fromCol: number, toRow: number, toCol: num
     let targetMesh: THREE.Mesh | null = null;
     piecesGroup.children.forEach(child => {
       if (child instanceof THREE.Mesh) {
-        const { row, col, isCaptured } = child.userData;
+        const { row, col, isCaptured } = (child as any).userData;
         // 找到目标位置且未被吃掉的棋子
         if (row === toRow && col === toCol && !isCaptured) {
           targetMesh = child;
@@ -743,9 +748,9 @@ function executeMove(fromRow: number, fromCol: number, toRow: number, toCol: num
     
     if (targetMesh) {
       // 标记为死子
-      (targetMesh as THREE.Mesh).userData.isCaptured = true;
-      (targetMesh as THREE.Mesh).userData.row = -1;
-      (targetMesh as THREE.Mesh).userData.col = -1;
+      (targetMesh as any).userData.isCaptured = true;
+      (targetMesh as any).userData.row = -1;
+      (targetMesh as any).userData.col = -1;
       
       // 移到棋盘边缘
       const startX = -((BOARD_WIDTH - 1) * CELL_SIZE) / 2;
@@ -756,7 +761,7 @@ function executeMove(fromRow: number, fromCol: number, toRow: number, toCol: num
       let capturedCount = 0;
       piecesGroup.children.forEach(other => {
         if (other instanceof THREE.Mesh) {
-          const otherData = other.userData;
+          const otherData = (other as any).userData;
           if (otherData.isCaptured) {
             const otherIsRed = otherData.piece > 0;
             if (otherIsRed === isRed) {
@@ -785,8 +790,8 @@ function executeMove(fromRow: number, fromCol: number, toRow: number, toCol: num
   }
   
   // 3. 更新拖动棋子的位置和状态
-  draggedPiece.userData.row = toRow;
-  draggedPiece.userData.col = toCol;
+  (draggedPiece as any).userData.row = toRow;
+  (draggedPiece as any).userData.col = toCol;
   
   const startX = -((BOARD_WIDTH - 1) * CELL_SIZE) / 2;
   const startZ = -((BOARD_HEIGHT - 1) * CELL_SIZE) / 2;
@@ -799,6 +804,11 @@ function executeMove(fromRow: number, fromCol: number, toRow: number, toCol: num
   
   // 5. 检查是否形成将军或绝杀
   checkCheckAndCheckmate(toRow, toCol);
+  
+  // 6. 如果轮到黑方（AI），触发 AI 行棋
+  if (chessStore.currentPlayer === 'black') {
+    triggerAIMove();
+  }
 }
 
 /**
@@ -855,6 +865,145 @@ function hasAnyLegalMove(board: Board, color: 'red' | 'black'): boolean {
 }
 
 /**
+ * 触发 AI 行棋
+ */
+async function triggerAIMove() {
+  // 如果 AI 正在思考，不重复触发
+  if (isAIThinking.value) {
+    return;
+  }
+  
+  // 启动引擎（如果尚未启动）
+  if (!engineStarted) {
+    try {
+      await startEngine();
+      engineStarted = true;
+      console.log('AI 引擎已启动');
+    } catch (error) {
+      console.error('启动 AI 引擎失败:', error);
+      return;
+    }
+  }
+  
+  isAIThinking.value = true;
+  console.log('AI 开始思考...');
+  
+  try {
+    // 获取当前局面的 FEN
+    const fen = chessStore.fen;
+    
+    // 请求 AI 最佳着法（搜索深度 15）
+    const bestMoveUCI = await getBestMove(fen, 15);
+    
+    console.log('AI 选择着法:', bestMoveUCI);
+    
+    // 转换 UCI 着法为内部坐标
+    const [fromRow, fromCol, toRow, toCol] = UCIToMove(bestMoveUCI);
+    
+    // 执行 AI 移动
+    executeAIMove(fromRow, fromCol, toRow, toCol);
+    
+  } catch (error) {
+    console.error('AI 行棋失败:', error);
+  } finally {
+    isAIThinking.value = false;
+  }
+}
+
+/**
+ * 执行 AI 移动（更新 3D 场景）
+ */
+function executeAIMove(fromRow: number, fromCol: number, toRow: number, toCol: number) {
+  console.log(`AI 移动: (${fromRow},${fromCol}) → (${toRow},${toCol})`);
+  
+  // 找到 AI 要移动的棋子
+  let aiPiece: THREE.Mesh | null = null;
+  piecesGroup.children.forEach(child => {
+    if (child instanceof THREE.Mesh) {
+      const userData = child.userData as any;
+      if (userData.row === fromRow && userData.col === fromCol && !userData.isCaptured) {
+        aiPiece = child;
+      }
+    }
+  });
+  
+  if (!aiPiece) {
+    console.error('未找到 AI 棋子');
+    return;
+  }
+  
+  // 处理吃子
+  const targetPiece = chessStore.board[toRow][toCol];
+  if (targetPiece !== PIECES.EMPTY) {
+    // 找到被吃的棋子并移到边缘
+    let targetMesh: THREE.Mesh | null = null;
+    piecesGroup.children.forEach(child => {
+      if (child instanceof THREE.Mesh) {
+        const userData = child.userData as any;
+        if (userData.row === toRow && userData.col === toCol && !userData.isCaptured) {
+          targetMesh = child;
+        }
+      }
+    });
+    
+    if (targetMesh) {
+      const targetUserData = (targetMesh as THREE.Mesh).userData as any;
+      targetUserData.isCaptured = true;
+      targetUserData.row = -1;
+      targetUserData.col = -1;
+      
+      const startX = -((BOARD_WIDTH - 1) * CELL_SIZE) / 2;
+      const startZ = -((BOARD_HEIGHT - 1) * CELL_SIZE) / 2;
+      const isRed = targetPiece > 0;
+      
+      let capturedCount = 0;
+      piecesGroup.children.forEach(other => {
+        if (other instanceof THREE.Mesh) {
+          const otherUserData = other.userData as any;
+          if (otherUserData.isCaptured) {
+            const otherIsRed = otherUserData.piece > 0;
+            if (otherIsRed === isRed) {
+              capturedCount++;
+            }
+          }
+        }
+      });
+      
+      if (isRed) {
+        const leftBoundary = startX - CELL_SIZE * 1.5;
+        const offsetZ = capturedCount * CELL_SIZE * 0.75;
+        (targetMesh as THREE.Mesh).position.x = leftBoundary;
+        (targetMesh as THREE.Mesh).position.z = startZ + offsetZ;
+      } else {
+        const rightBoundary = startX + (BOARD_WIDTH - 1) * CELL_SIZE + CELL_SIZE * 1.5;
+        const offsetZ = capturedCount * CELL_SIZE * 0.75;
+        (targetMesh as THREE.Mesh).position.x = rightBoundary;
+        (targetMesh as THREE.Mesh).position.z = startZ + offsetZ;
+      }
+      
+      (targetMesh as THREE.Mesh).position.y = 0;
+    }
+  }
+  
+  // 移动 AI 棋子
+  const aiUserData = (aiPiece as THREE.Mesh).userData as any;
+  aiUserData.row = toRow;
+  aiUserData.col = toCol;
+  
+  const startX = -((BOARD_WIDTH - 1) * CELL_SIZE) / 2;
+  const startZ = -((BOARD_HEIGHT - 1) * CELL_SIZE) / 2;
+  (aiPiece as THREE.Mesh).position.x = startX + toCol * CELL_SIZE;
+  (aiPiece as THREE.Mesh).position.z = startZ + toRow * CELL_SIZE;
+  (aiPiece as THREE.Mesh).position.y = 0;
+  
+  // 更新棋盘数据
+  chessStore.movePiece(fromRow, fromCol, toRow, toCol);
+  
+  // 检查将军/绝杀
+  checkCheckAndCheckmate(toRow, toCol);
+}
+
+/**
  * 显示将军提示
  */
 function displayCheckAlert() {
@@ -896,7 +1045,7 @@ function displayCheckmateAlert() {
  * 重置棋子位置到原位
  */
 function resetPiecePosition(pieceMesh: THREE.Mesh) {
-  const { row, col } = pieceMesh.userData;
+  const { row, col } = (pieceMesh as any).userData;
   const startX = -((BOARD_WIDTH - 1) * CELL_SIZE) / 2;
   const startZ = -((BOARD_HEIGHT - 1) * CELL_SIZE) / 2;
   
@@ -952,6 +1101,14 @@ function hideCheckAlert() {
 onMounted(() => {
   initScene();
   window.addEventListener('resize', onWindowResize);
+  
+  // 启动 AI 引擎
+  startEngine().then(() => {
+    engineStarted = true;
+    console.log('AI 引擎已就绪');
+  }).catch(error => {
+    console.error('启动 AI 引擎失败:', error);
+  });
   
   // 添加键盘事件监听，按住 Ctrl 键时启用摄像头旋转
   const handleKeyDown = (event: KeyboardEvent) => {
@@ -1035,5 +1192,4 @@ onBeforeUnmount(() => {
     transform: translate(-50%, -50%) scale(1.1);
   }
 }
-
 </style>
