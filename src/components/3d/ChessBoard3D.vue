@@ -934,6 +934,15 @@ async function triggerAIMove() {
 function executeAIMove(fromRow: number, fromCol: number, toRow: number, toCol: number) {
   console.log(`AI 移动: (${fromRow},${fromCol}) → (${toRow},${toCol})`);
   
+  // 验证 AI 着法是否符合规则
+  const board = chessStore.board;
+  if (!isValidMove(board, fromRow, fromCol, toRow, toCol)) {
+    console.error(`AI 着法不合法: (${fromRow},${fromCol}) → (${toRow},${toCol})`);
+    console.error('当前棋盘状态:', board);
+    return;
+  }
+  console.log('AI 着法验证通过');
+  
   // 找到 AI 要移动的棋子
   let aiPiece: THREE.Mesh | null = null;
   piecesGroup.children.forEach(child => {
