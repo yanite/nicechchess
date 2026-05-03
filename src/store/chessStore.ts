@@ -156,11 +156,16 @@ export const useChessStore = defineStore('chess', () => {
 
   /**
    * 生成 FEN 串
+   * 
+   * 注意：UCI 协议要求 FEN 从黑方底线（第9行）开始，到红方底线（第0行）结束
+   * 内部坐标系：board[0] = 黑方底线，board[9] = 红方底线
+   * 所以应该从 row=0 遍历到 row=9
    */
   function generateFEN(): string {
     let fen = '';
     
-    for (let row = 9; row >= 0; row--) {
+    // 从黑方底线（row=0）开始，到红方底线（row=9）结束
+    for (let row = 0; row < 10; row++) {
       let emptyCount = 0;
       
       for (let col = 0; col < 9; col++) {
@@ -184,13 +189,13 @@ export const useChessStore = defineStore('chess', () => {
         fen += emptyCount;
       }
       
-      if (row > 0) {
+      if (row < 9) {
         fen += '/';
       }
     }
     
     // 添加当前行棋方
-    // 测试：Pikafish 可能使用国际象棋标准的 w/b 而非 r/b
+    // 使用国际象棋标准：w=红方(先手), b=黑方(后手)
     fen += ` ${currentPlayer.value === 'red' ? 'w' : 'b'}`;
     
     // TODO: 添加其他 FEN 字段（易位、吃过路兵等）
