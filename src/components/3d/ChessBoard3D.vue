@@ -20,6 +20,7 @@ import { isValidMove, isInCheck } from '../../logic/chess/rules';
 import checkImage from '../../assets/将军.png';
 import checkmateImage from '../../assets/绝杀.png';
 import { startEngine, getBestMove } from '../../services/engineService';
+import { loadConfig } from '../../services/configService';
 
 const container = ref<HTMLDivElement | null>(null);
 const chessStore = useChessStore();
@@ -59,8 +60,18 @@ const BOARD_MARGIN_Z = 1.0; // 上下边界（一个棋子尺寸）
 /**
  * 初始化 Three.js 场景
  */
-function initScene() {
+async function initScene() {
   if (!container.value) return;
+
+  // 加载配置
+  let boardTexturePath = 'src/assets/textures/tx1.jpg';
+  try {
+    const config = await loadConfig();
+    boardTexturePath = config.ui.board_texture;
+    console.log('加载棋盘纹理配置:', boardTexturePath);
+  } catch (error) {
+    console.warn('加载配置失败，使用默认纹理:', error);
+  }
 
   // 创建场景
   scene = new THREE.Scene();
@@ -88,7 +99,7 @@ function initScene() {
   setupLights();
 
   // 创建棋盘和棋子
-  createBoard();
+  createBoard(boardTexturePath);
   createPieces();
 
   // 初始化射线检测
@@ -163,8 +174,9 @@ function createThickLine(points: THREE.Vector3[], color: number, lineWidth: numb
 
 /**
  * 创建棋盘
+ * @param texturePath - 棋盘纹理路径
  */
-function createBoard() {
+function createBoard(texturePath: string) {
   // 清空之前的 LineMaterial 引用
   lineMaterials = [];
   
@@ -176,10 +188,25 @@ function createBoard() {
   const boardWidth = (BOARD_WIDTH - 1) * CELL_SIZE + BOARD_MARGIN_X * 2;
   const boardHeight = (BOARD_HEIGHT - 1) * CELL_SIZE + BOARD_MARGIN_Z * 2;
   const boardGeometry = new THREE.BoxGeometry(boardWidth, 0.2, boardHeight);
+  
+  // 加载纹理
+  const textureLoader = new THREE.TextureLoader();
   const boardMaterial = new THREE.MeshStandardMaterial({ 
-    color: 0xDEB887,
+    map: textureLoader.load(texturePath, 
+      (texture) => {
+        console.log('棋盘纹理加载成功:', texturePath);
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.RepeatWrapping;
+        texture.repeat.set(1, 1);
+      },
+      undefined,
+      (error) => {
+        console.warn('棋盘纹理加载失败，使用默认颜色:', error);
+      }
+    ),
     roughness: 0.7 
   });
+  
   const boardMesh = new THREE.Mesh(boardGeometry, boardMaterial);
   boardMesh.position.y = -0.1;
   boardMesh.receiveShadow = true;
