@@ -7,8 +7,8 @@ import {
   type PieceType,
   boardToUCI,
   getPieceColor,
-  BOARD_HEIGHT,
-  BOARD_WIDTH
+  BOARD_ROWS,
+  BOARD_COLS
 } from '../logic/chess/constants';
 
 // 着法记录接口
@@ -59,7 +59,7 @@ export const useChessStore = defineStore('chess', () => {
    */
   function selectPiece(row: number, col: number) {
     // 如果传入无效坐标，取消选择
-    if (row < 0 || row >= BOARD_HEIGHT || col < 0 || col >= BOARD_WIDTH) {
+    if (row < 0 || row >= BOARD_ROWS || col < 0 || col >= BOARD_COLS) {
       selectedPiece.value = null;
       return;
     }
