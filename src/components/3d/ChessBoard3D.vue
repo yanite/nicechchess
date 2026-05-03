@@ -902,6 +902,16 @@ async function triggerAIMove() {
     const fen = chessStore.fen;
     console.log('当前 FEN:', fen);
     
+    // 打印棋盘状态用于调试
+    console.log('当前棋盘 (board[9]=红方, board[0]=黑方):');
+    for (let r = 9; r >= 0; r--) {
+      const rowPieces = chessStore.board[r].map(p => {
+        if (p === PIECES.EMPTY) return '.';
+        return p > 0 ? 'R' : 'B';
+      }).join(' ');
+      console.log(`  board[${r}]: ${rowPieces}`);
+    }
+    
     // 请求 AI 最佳着法（搜索深度 15）
     console.log('调用 getBestMove...');
     const bestMoveUCI = await getBestMove(fen, 15);
@@ -912,7 +922,9 @@ async function triggerAIMove() {
     // 转换 UCI 着法为内部坐标
     console.log('开始转换坐标...');
     const [fromRow, fromCol, toRow, toCol] = UCIToMove(bestMoveUCI);
-    console.log(`转换后的坐标: (${fromRow},${fromCol}) → (${toRow},${toCol})`);
+    console.log(`UCI: ${bestMoveUCI} → 内部坐标: (${fromRow},${fromCol}) → (${toRow},${toCol})`);
+    console.log(`起始位置棋子: ${chessStore.board[fromRow][fromCol]} (${chessStore.board[fromRow][fromCol] > 0 ? '红方' : '黑方'})`);
+    console.log(`目标位置棋子: ${chessStore.board[toRow][toCol]}`);
     
     // 执行 AI 移动
     console.log('执行 AI 移动...');
