@@ -4,13 +4,13 @@ use tauri::State;
 
 /// 引擎状态结构体
 pub struct EngineState {
-    pub process: Option<Mutex<Child>>,
+    pub process: Mutex<Option<Child>>,
 }
 
 impl EngineState {
     pub fn new() -> Self {
         EngineState {
-            process: None,
+            process: Mutex::new(None),
         }
     }
 }
@@ -19,8 +19,11 @@ impl EngineState {
 #[tauri::command]
 pub fn start_engine(state: State<EngineState>) -> Result<String, String> {
     // 检查引擎是否已经在运行
-    if state.process.is_some() {
-        return Err("引擎已经在运行".to_string());
+    {
+        let process_guard = state.process.lock().map_err(|e| format!("锁定失败: {}", e))?;
+        if process_guard.is_some() {
+            return Err("引擎已经在运行".to_string());
+        }
     }
 
     // Pikafish 引擎路径（相对于 public 目录）
@@ -37,7 +40,7 @@ pub fn start_engine(state: State<EngineState>) -> Result<String, String> {
     {
         Ok(child) => {
             println!("引擎启动成功");
-            *state.process.lock().unwrap() = Some(Mutex::new(child));
+            *state.process.lock().map_err(|e| format!("锁定失败: {}", e))? = Some(child);
             
             // 发送 UCI 命令初始化引擎
             send_uci_command(&state)?;
@@ -55,19 +58,17 @@ pub fn start_engine(state: State<EngineState>) -> Result<String, String> {
 /// 停止引擎
 #[tauri::command]
 pub fn stop_engine(state: State<EngineState>) -> Result<String, String> {
-    if let Some(process_mutex) = &state.process {
-        let mut process_guard = process_mutex.lock().unwrap();
-        if let Some(mut child) = process_guard.take() {
-            // 发送 quit 命令
-            if let Some(mut stdin) = child.stdin.take() {
-                use std::io::Write;
-                let _ = stdin.write_all(b"quit\n");
-            }
-            
-            // 等待进程结束
-            let _ = child.wait();
-            println!("引擎已停止");
+    let mut process_guard = state.process.lock().map_err(|e| format!("锁定失败: {}", e))?;
+    if let Some(mut child) = process_guard.take() {
+        // 发送 quit 命令
+        if let Some(mut stdin) = child.stdin.take() {
+            use std::io::Write;
+            let _ = stdin.write_all(b"quit\n");
         }
+        
+        // 等待进程结束
+        let _ = child.wait();
+        println!("引擎已停止");
         Ok("引擎已停止".to_string())
     } else {
         Err("引擎未启动".to_string())
@@ -81,22 +82,18 @@ pub fn get_best_move(
     fen: String,
     depth: u32,
 ) -> Result<String, String> {
-    if let Some(process_mutex) = &state.process {
-        let mut process_guard = process_mutex.lock().unwrap();
-        if let Some(ref mut child) = *process_guard {
-            // 设置局面
-            set_position(child, &fen)?;
-            
-            // 开始思考
-            go_think(child, depth)?;
-            
-            // 读取最佳着法
-            let best_move = read_best_move(child)?;
-            
-            Ok(best_move)
-        } else {
-            Err("引擎未启动".to_string())
-        }
+    let mut process_guard = state.process.lock().map_err(|e| format!("锁定失败: {}", e))?;
+    if let Some(ref mut child) = *process_guard {
+        // 设置局面
+        set_position(child, &fen)?;
+        
+        // 开始思考
+        go_think(child, depth)?;
+        
+        // 读取最佳着法
+        let best_move = read_best_move(child)?;
+        
+        Ok(best_move)
     } else {
         Err("引擎未启动".to_string())
     }
@@ -104,9 +101,8 @@ pub fn get_best_move(
 
 /// 发送 UCI 命令初始化引擎
 fn send_uci_command(state: &State<EngineState>) -> Result<(), String> {
-    if let Some(process_mutex) = &state.process {
-        let mut process_guard = process_mutex.lock().unwrap();
-        if let Some(ref mut child) = *process_guard {
+    let mut process_guard = state.process.lock().map_err(|e| format!("锁定失败: {}", e))?;
+    if let Some(ref mut child) = *process_guard {
             if let Some(mut stdin) = child.stdin.take() {
                 use std::io::Write;
                 
