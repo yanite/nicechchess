@@ -559,9 +559,7 @@ function onMouseClick(event: MouseEvent) {
       // TODO: 添加规则校验
       const success = chessStore.movePiece(fromRow, fromCol, row, col);
       
-      if (success) {
-        updatePieces();
-      }
+      // updatePieces() 会通过 watch 自动调用，不需要手动调用
     } else {
       // 否则选择该棋子
       chessStore.selectPiece(row, col);
