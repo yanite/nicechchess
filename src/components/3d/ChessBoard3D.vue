@@ -580,17 +580,29 @@ function highlightPiece(mesh: THREE.Object3D) {
   // 重置所有棋子颜色
   piecesGroup.children.forEach(child => {
     if (child instanceof THREE.Mesh) {
-      const material = child.material as THREE.MeshStandardMaterial;
+      const materials = Array.isArray(child.material) ? child.material : [child.material];
       const isRed = child.userData.piece > 0;
-      material.color.setHex(isRed ? 0xFF0000 : 0x000000);
-      material.emissive.setHex(0x000000);
+      
+      // 更新所有材质的颜色
+      materials.forEach(mat => {
+        if (mat instanceof THREE.MeshStandardMaterial) {
+          mat.color.setHex(isRed ? 0xFF0000 : 0x000000);
+          mat.emissive.setHex(0x000000);
+        }
+      });
     }
   });
   
   // 高亮当前选中的棋子
   if (mesh instanceof THREE.Mesh) {
-    const material = mesh.material as THREE.MeshStandardMaterial;
-    material.emissive.setHex(0x444444);
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    
+    // 为选中棋子添加发光效果
+    materials.forEach(mat => {
+      if (mat instanceof THREE.MeshStandardMaterial) {
+        mat.emissive.setHex(0x444444);
+      }
+    });
   }
 }
 
