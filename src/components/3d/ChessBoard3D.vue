@@ -27,7 +27,7 @@ const BOARD_WIDTH = 9;
 const BOARD_HEIGHT = 10;
 const CELL_SIZE = 1;
 const BOARD_MARGIN_X = 0.5; // 左右边界
-const BOARD_MARGIN_Z = 1.5; // 上下边界
+const BOARD_MARGIN_Z = 1.0; // 上下边界（一个棋子尺寸）
 
 /**
  * 初始化 Three.js 场景
