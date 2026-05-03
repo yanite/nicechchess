@@ -39,10 +39,10 @@ function initScene() {
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0xf0f0f0);
 
-  // 创建相机
+  // 创建相机 - 初始位置正对棋盘（俯视）
   const aspect = container.value.clientWidth / container.value.clientHeight;
   camera = new THREE.PerspectiveCamera(45, aspect, 0.1, 1000);
-  camera.position.set(0, 12, 12);
+  camera.position.set(0, 15, 0); // 正上方俯视
   camera.lookAt(0, 0, 0);
 
   // 创建渲染器
@@ -51,10 +51,11 @@ function initScene() {
   renderer.shadowMap.enabled = true;
   container.value.appendChild(renderer.domElement);
 
-  // 添加轨道控制器
+  // 添加轨道控制器 - 默认禁用，需要按住 Ctrl 才能旋转
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.05;
+  controls.enabled = false; // 默认禁用旋转
 
   // 添加灯光
   setupLights();
@@ -575,10 +576,39 @@ function onWindowResize() {
 onMounted(() => {
   initScene();
   window.addEventListener('resize', onWindowResize);
+  
+  // 添加键盘事件监听，按住 Ctrl 键时启用摄像头旋转
+  const handleKeyDown = (event: KeyboardEvent) => {
+    if (event.ctrlKey && controls) {
+      controls.enabled = true;
+    }
+  };
+  
+  const handleKeyUp = (event: KeyboardEvent) => {
+    if (!event.ctrlKey && controls) {
+      controls.enabled = false;
+    }
+  };
+  
+  window.addEventListener('keydown', handleKeyDown);
+  window.addEventListener('keyup', handleKeyUp);
+  
+  // 保存清理函数
+  (window as any).__chessControlsCleanup = () => {
+    window.removeEventListener('keydown', handleKeyDown);
+    window.removeEventListener('keyup', handleKeyUp);
+  };
 });
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', onWindowResize);
+  
+  // 清理键盘事件监听
+  if ((window as any).__chessControlsCleanup) {
+    (window as any).__chessControlsCleanup();
+    delete (window as any).__chessControlsCleanup;
+  }
+  
   if (renderer) {
     renderer.dispose();
   }
