@@ -253,7 +253,7 @@ function drawBoardLines() {
  */
 function drawPieceMarkers(startX: number, startZ: number) {
   const markerMaterial = new THREE.LineBasicMaterial({ color: 0x000000 });
-  const markerSize = 0.15; // 位标拐线长度
+  const markerSize = 0.12; // 位标拐线长度（减小以避免超出边界）
 
   // 定义需要绘制位标的位置（col, row）
   const markerPositions = [
