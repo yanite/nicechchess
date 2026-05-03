@@ -757,7 +757,8 @@ function executeMove(fromRow: number, fromCol: number, toRow: number, toCol: num
     piecesGroup.children.forEach(child => {
       if (child instanceof THREE.Mesh) {
         const { row, col } = child.userData;
-        if (row === toRow && col === toCol) {
+        // 排除正在拖动的棋子本身
+        if (row === toRow && col === toCol && child !== draggedPiece) {
           // 移到边界外
           child.position.x = 100;
           child.position.z = 100;
