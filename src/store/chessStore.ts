@@ -56,6 +56,12 @@ export const useChessStore = defineStore('chess', () => {
    * 选择棋子
    */
   function selectPiece(row: number, col: number) {
+    // 如果传入无效坐标，取消选择
+    if (row < 0 || row >= BOARD_HEIGHT || col < 0 || col >= BOARD_WIDTH) {
+      selectedPiece.value = null;
+      return;
+    }
+    
     const piece = board.value[row][col];
     
     // 只能选择当前行棋方的棋子
