@@ -41,15 +41,10 @@ pub struct UIConfig {
 }
 
 impl AppConfig {
-    /// 获取配置文件路径
+    /// 获取配置文件路径（使用可执行程序当前目录）
     fn get_config_path() -> PathBuf {
-        // 使用应用数据目录存储配置
-        if let Some(config_dir) = dirs::config_dir() {
-            config_dir.join("chchess").join("config.yaml")
-        } else {
-            // 降级方案：使用当前目录
-            PathBuf::from("config.yaml")
-        }
+        // 直接使用当前工作目录下的 config.yaml
+        PathBuf::from("config.yaml")
     }
 
     /// 加载配置
