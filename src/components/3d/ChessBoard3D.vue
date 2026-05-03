@@ -26,6 +26,11 @@ let raycaster: THREE.Raycaster;
 let mouse: THREE.Vector2;
 let lineMaterials: LineMaterial[] = []; // 存储所有 LineMaterial，用于更新分辨率
 
+// 拖动相关变量
+let draggedPiece: THREE.Mesh | null = null; // 当前拖动的棋子
+let isDragging = false; // 是否正在拖动
+let dragOffset = new THREE.Vector3(); // 拖动偏移量
+
 // 棋盘尺寸配置
 const BOARD_WIDTH = 9;
 const BOARD_HEIGHT = 10;
@@ -72,8 +77,10 @@ function initScene() {
   raycaster = new THREE.Raycaster();
   mouse = new THREE.Vector2();
 
-  // 添加点击事件监听
-  renderer.domElement.addEventListener('click', onMouseClick);
+  // 添加鼠标事件监听
+  renderer.domElement.addEventListener('mousedown', onMouseDown);
+  renderer.domElement.addEventListener('mousemove', onMouseMove);
+  renderer.domElement.addEventListener('mouseup', onMouseUp);
 
   // 开始渲染循环
   animate();
@@ -361,6 +368,32 @@ function drawPieceMarkers(startX: number, startZ: number) {
 }
 
 /**
+ * 规则验证函数（目前假设所有移动都合法）
+ * @param fromRow 起始行
+ * @param fromCol 起始列
+ * @param toRow 目标行
+ * @param toCol 目标列
+ * @returns 是否合法
+ */
+function validateMove(fromRow: number, fromCol: number, toRow: number, toCol: number): boolean {
+  // TODO: 实现完整的规则验证
+  // 目前假设所有移动都合法
+  
+  // 基本检查：不能移动到同一个位置
+  if (fromRow === toRow && fromCol === toCol) {
+    return false;
+  }
+  
+  // 基本检查：目标位置必须在棋盘内
+  if (toRow < 0 || toRow >= BOARD_HEIGHT || toCol < 0 || toCol >= BOARD_WIDTH) {
+    return false;
+  }
+  
+  // 暂时返回 true，后续会实现具体规则
+  return true;
+}
+
+/**
  * 创建所有棋子（只在初始化时调用一次）
  */
 function createPieces() {
@@ -594,9 +627,9 @@ function getPieceChineseName(piece: PieceType): string {
 }
 
 /**
- * 鼠标点击处理
+ * 鼠标按下事件 - 开始拖动棋子
  */
-function onMouseClick(event: MouseEvent) {
+function onMouseDown(event: MouseEvent) {
   if (!container.value) return;
 
   // 计算鼠标位置
@@ -609,27 +642,148 @@ function onMouseClick(event: MouseEvent) {
   const intersects = raycaster.intersectObjects(piecesGroup.children);
 
   if (intersects.length > 0) {
-    const selectedObject = intersects[0].object;
-    const { row, col, piece } = selectedObject.userData;
+    const selectedObject = intersects[0].object as THREE.Mesh;
     
-    // 如果已经选中了棋子，则尝试移动
-    if (chessStore.selectedPiece) {
-      const [fromRow, fromCol] = chessStore.selectedPiece;
+    // 检查是否是当前行棋方的棋子
+    const { row, col, piece } = selectedObject.userData;
+    const pieceColor = piece > 0 ? 'red' : 'black';
+    
+    if (pieceColor === chessStore.currentPlayer) {
+      // 开始拖动
+      draggedPiece = selectedObject;
+      isDragging = true;
       
-      // TODO: 添加规则校验
-      const success = chessStore.movePiece(fromRow, fromCol, row, col);
+      // 计算拖动偏移量（保持棋子与鼠标的相对位置）
+      const planeY = 0.5; // 拖动平面高度
+      const intersectPoint = new THREE.Vector3();
+      const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -planeY);
+      raycaster.ray.intersectPlane(plane, intersectPoint);
       
-      // updatePieces() 会通过 watch 自动调用，不需要手动调用
+      dragOffset.copy(selectedObject.position).sub(intersectPoint);
+      
+      // 抬起棋子
+      selectedObject.position.y = 0.8;
+    }
+  }
+}
+
+/**
+ * 鼠标移动事件 - 拖动棋子跟随鼠标
+ */
+function onMouseMove(event: MouseEvent) {
+  if (!isDragging || !draggedPiece || !container.value) return;
+
+  // 计算鼠标位置
+  const rect = renderer.domElement.getBoundingClientRect();
+  mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+  // 射线检测
+  raycaster.setFromCamera(mouse, camera);
+  
+  // 在水平面上投射
+  const planeY = 0.5;
+  const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -planeY);
+  const intersectPoint = new THREE.Vector3();
+  
+  if (raycaster.ray.intersectPlane(plane, intersectPoint)) {
+    // 更新棋子位置（保持偏移量）
+    draggedPiece.position.x = intersectPoint.x + dragOffset.x;
+    draggedPiece.position.z = intersectPoint.z + dragOffset.z;
+  }
+}
+
+/**
+ * 鼠标释放事件 - 放置棋子
+ */
+function onMouseUp(event: MouseEvent) {
+  if (!isDragging || !draggedPiece || !container.value) {
+    isDragging = false;
+    draggedPiece = null;
+    return;
+  }
+
+  // 计算鼠标位置
+  const rect = renderer.domElement.getBoundingClientRect();
+  mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+  // 射线检测棋盘平面
+  raycaster.setFromCamera(mouse, camera);
+  const planeY = 0;
+  const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -planeY);
+  const intersectPoint = new THREE.Vector3();
+  
+  if (raycaster.ray.intersectPlane(plane, intersectPoint)) {
+    // 计算目标格子坐标
+    const startX = -((BOARD_WIDTH - 1) * CELL_SIZE) / 2;
+    const startZ = -((BOARD_HEIGHT - 1) * CELL_SIZE) / 2;
+    
+    const toCol = Math.round((intersectPoint.x - startX) / CELL_SIZE);
+    const toRow = Math.round((intersectPoint.z - startZ) / CELL_SIZE);
+    
+    // 获取起始位置
+    const fromRow = draggedPiece.userData.row;
+    const fromCol = draggedPiece.userData.col;
+    
+    // 验证移动是否合法
+    if (validateMove(fromRow, fromCol, toRow, toCol)) {
+      // 执行移动
+      executeMove(fromRow, fromCol, toRow, toCol);
     } else {
-      // 否则选择该棋子
-      chessStore.selectPiece(row, col);
-      // updatePieces() 会通过 watch 自动调用，抬起选中的棋子
+      // 移动不合法，回到原位
+      resetPiecePosition(draggedPiece);
     }
   } else {
-    // 点击空白处，取消选择
-    chessStore.selectPiece(-1, -1);
-    // updatePieces() 会通过 watch 自动调用，放下所有棋子
+    // 没有命中棋盘，回到原位
+    resetPiecePosition(draggedPiece);
   }
+  
+  // 重置拖动状态
+  isDragging = false;
+  draggedPiece = null;
+}
+
+/**
+ * 执行移动
+ */
+function executeMove(fromRow: number, fromCol: number, toRow: number, toCol: number) {
+  const board = chessStore.board;
+  const targetPiece = board[toRow][toCol];
+  
+  // 如果目标位置有棋子，将其移到边界外
+  if (targetPiece !== PIECES.EMPTY) {
+    // 找到目标位置的棋子网格
+    piecesGroup.children.forEach(child => {
+      if (child instanceof THREE.Mesh) {
+        const { row, col } = child.userData;
+        if (row === toRow && col === toCol) {
+          // 移到边界外
+          child.position.x = 100;
+          child.position.z = 100;
+          child.position.y = -100;
+        }
+      }
+    });
+  }
+  
+  // 更新棋盘数据
+  chessStore.movePiece(fromRow, fromCol, toRow, toCol);
+  
+  // updatePieces 会通过 watch 自动调用，更新所有棋子位置
+}
+
+/**
+ * 重置棋子位置到原位
+ */
+function resetPiecePosition(pieceMesh: THREE.Mesh) {
+  const { row, col } = pieceMesh.userData;
+  const startX = -((BOARD_WIDTH - 1) * CELL_SIZE) / 2;
+  const startZ = -((BOARD_HEIGHT - 1) * CELL_SIZE) / 2;
+  
+  pieceMesh.position.x = startX + col * CELL_SIZE;
+  pieceMesh.position.z = startZ + row * CELL_SIZE;
+  pieceMesh.position.y = 0;
 }
 
 /**
@@ -690,6 +844,13 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', onWindowResize);
+  
+  // 清理鼠标事件监听
+  if (renderer && renderer.domElement) {
+    renderer.domElement.removeEventListener('mousedown', onMouseDown);
+    renderer.domElement.removeEventListener('mousemove', onMouseMove);
+    renderer.domElement.removeEventListener('mouseup', onMouseUp);
+  }
   
   // 清理键盘事件监听
   if ((window as any).__chessControlsCleanup) {
