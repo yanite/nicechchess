@@ -191,21 +191,43 @@ function createBoard(texturePath: string) {
   
   // 加载纹理
   const textureLoader = new THREE.TextureLoader();
-  const boardMaterial = new THREE.MeshStandardMaterial({ 
-    map: textureLoader.load(texturePath, 
-      (texture) => {
+  let boardMaterial: THREE.MeshStandardMaterial;
+  
+  // 尝试加载纹理，如果失败则使用默认颜色
+  try {
+    console.log('尝试加载棋盘纹理:', texturePath);
+    const texture = textureLoader.load(
+      texturePath,
+      (loadedTexture) => {
         console.log('棋盘纹理加载成功:', texturePath);
-        texture.wrapS = THREE.RepeatWrapping;
-        texture.wrapT = THREE.RepeatWrapping;
-        texture.repeat.set(1, 1);
+        loadedTexture.wrapS = THREE.RepeatWrapping;
+        loadedTexture.wrapT = THREE.RepeatWrapping;
+        loadedTexture.repeat.set(1, 1);
       },
       undefined,
       (error) => {
-        console.warn('棋盘纹理加载失败，使用默认颜色:', error);
+        console.warn('棋盘纹理加载失败，使用默认木纹颜色:', error);
+        console.warn('纹理路径:', texturePath);
+        // 降级到默认木纹颜色
+        boardMaterial = new THREE.MeshStandardMaterial({ 
+          color: 0xDEB887,  // 实木色
+          roughness: 0.7 
+        });
       }
-    ),
-    roughness: 0.7 
-  });
+    );
+    
+    // 如果纹理加载成功，使用纹理材质
+    boardMaterial = new THREE.MeshStandardMaterial({ 
+      map: texture,
+      roughness: 0.7 
+    });
+  } catch (error) {
+    console.error('纹理加载异常，使用默认颜色:', error);
+    boardMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0xDEB887,  // 实木色
+      roughness: 0.7 
+    });
+  }
   
   const boardMesh = new THREE.Mesh(boardGeometry, boardMaterial);
   boardMesh.position.y = -0.1;
@@ -500,7 +522,7 @@ function createPieces() {
 /**
  * 创建单个棋子网格（带文字）
  */
-function createPieceMesh(piece: PieceType, row: number, col: number): THREE.Mesh {
+function createPieceMesh(piece: PieceType, _row: number, _col: number): THREE.Mesh {
   const radius = CELL_SIZE * 0.4;
   const height = CELL_SIZE * 0.25;
   

@@ -106,7 +106,7 @@ impl AppConfig {
                 pikafish_path: "public/pikafish/pikafish-vnni512.exe".to_string(),
             },
             ui: UIConfig {
-                board_texture: "src/assets/textures/tx1.jpg".to_string(),
+                board_texture: "src/assets/textures/tx1/dark_wood_diff_1k.jpg".to_string(),
             },
         }
     }
