@@ -26,7 +26,8 @@ let mouse: THREE.Vector2;
 const BOARD_WIDTH = 9;
 const BOARD_HEIGHT = 10;
 const CELL_SIZE = 1;
-const BOARD_MARGIN = 0.5; // 边缘留半个棋子尺寸
+const BOARD_MARGIN_X = 0.5; // 左右边界
+const BOARD_MARGIN_Z = 1.5; // 上下边界
 
 /**
  * 初始化 Three.js 场景
@@ -102,10 +103,9 @@ function createBoard() {
 
   // 棋盘底座尺寸计算
   // 棋盘有 9 列（8个间隔），10 行（9个间隔）
-  // 所以底座宽度 = 8 * CELL_SIZE + BOARD_MARGIN * 2
-  // 底座高度 = 9 * CELL_SIZE + BOARD_MARGIN * 2
-  const boardWidth = (BOARD_WIDTH - 1) * CELL_SIZE + BOARD_MARGIN * 2;
-  const boardHeight = (BOARD_HEIGHT - 1) * CELL_SIZE + BOARD_MARGIN * 2;
+  // 左右边界使用 BOARD_MARGIN_X，上下边界使用 BOARD_MARGIN_Z
+  const boardWidth = (BOARD_WIDTH - 1) * CELL_SIZE + BOARD_MARGIN_X * 2;
+  const boardHeight = (BOARD_HEIGHT - 1) * CELL_SIZE + BOARD_MARGIN_Z * 2;
   const boardGeometry = new THREE.BoxGeometry(boardWidth, 0.2, boardHeight);
   const boardMaterial = new THREE.MeshStandardMaterial({ 
     color: 0xDEB887,
