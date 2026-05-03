@@ -203,20 +203,22 @@ export const useChessStore = defineStore('chess', () => {
    */
   function getPieceChar(piece: PieceType): string {
     const pieceChars: Record<number, string> = {
-      [PIECES.R_KING]: 'K',
-      [PIECES.R_CAR]: 'R',
-      [PIECES.R_HORSE]: 'H',
-      [PIECES.R_CANNON]: 'C',
-      [PIECES.R_BISHOP]: 'A',
-      [PIECES.R_ELEPHANT]: 'E',
-      [PIECES.R_PAWN]: 'P',
-      [PIECES.B_KING]: 'k',
-      [PIECES.B_CAR]: 'r',
-      [PIECES.B_HORSE]: 'h',
-      [PIECES.B_CANNON]: 'c',
-      [PIECES.B_BISHOP]: 'a',
-      [PIECES.B_ELEPHANT]: 'e',
-      [PIECES.B_PAWN]: 'p',
+      // 红方棋子（大写）
+      [PIECES.R_KING]: 'K',      // 帅/将
+      [PIECES.R_CAR]: 'R',       // 车
+      [PIECES.R_HORSE]: 'N',     // 马（Knight）
+      [PIECES.R_CANNON]: 'C',    // 炮
+      [PIECES.R_BISHOP]: 'A',    // 士/仕（Advisor）
+      [PIECES.R_ELEPHANT]: 'B',  // 相/象（Bishop）
+      [PIECES.R_PAWN]: 'P',      // 兵
+      // 黑方棋子（小写）
+      [PIECES.B_KING]: 'k',      // 将
+      [PIECES.B_CAR]: 'r',       // 车
+      [PIECES.B_HORSE]: 'n',     // 马（Knight）
+      [PIECES.B_CANNON]: 'c',    // 炮
+      [PIECES.B_BISHOP]: 'a',    // 士
+      [PIECES.B_ELEPHANT]: 'b',  // 象（Bishop）
+      [PIECES.B_PAWN]: 'p',      // 卒
     };
     
     return pieceChars[piece] || '';
