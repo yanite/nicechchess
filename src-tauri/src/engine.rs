@@ -190,19 +190,29 @@ fn go_think(child: &mut Child, depth: u32) -> Result<(), String> {
 
 /// 读取最佳着法
 fn read_best_move(child: &mut Child) -> Result<String, String> {
+    println!("开始读取引擎最佳着法...");
     if let Some(stdout) = &mut child.stdout {
         use std::io::BufRead;
         let reader = std::io::BufReader::new(stdout);
+        let mut line_count = 0;
         for line in reader.lines() {
             match line {
                 Ok(l) => {
-                    println!("引擎思考: {}", l);
+                    line_count += 1;
+                    println!("引擎思考 [第{}行]: {}", line_count, l);
                     // 查找 bestmove 行
                     if l.starts_with("bestmove") {
                         let parts: Vec<&str> = l.split_whitespace().collect();
                         if parts.len() >= 2 {
+                            println!("找到最佳着法: {}", parts[1]);
                             return Ok(parts[1].to_string());
+                        } else {
+                            println!("bestmove 行格式错误: {}", l);
                         }
+                    }
+                    // 防止无限循环，最多读取 1000 行
+                    if line_count > 1000 {
+                        return Err(format!("读取超过 1000 行仍未找到 bestmove"));
                     }
                 }
                 Err(e) => {
