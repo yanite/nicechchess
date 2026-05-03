@@ -320,68 +320,13 @@ function validateCapture(
 }
 
 /**
- * 检查指定颜色是否有合法的着法可以解除将军状态
- * @param board 棋盘状态
- * @param color 颜色
- * @returns 是否有合法的解将着法
- */
-function hasLegalEscapeMoves(board: Board, color: 'red' | 'black'): boolean {
-  // 遍历该颜色的所有棋子
-  for (let fromRow = 0; fromRow < BOARD_ROWS; fromRow++) {
-    for (let fromCol = 0; fromCol < BOARD_COLS; fromCol++) {
-      const piece = board[fromRow][fromCol];
-      
-      // 跳过空位和对方的棋子
-      if (piece === PIECES.EMPTY || getPieceColor(piece) !== color) {
-        continue;
-      }
-      
-      // 尝试所有可能的目标位置
-      for (let toRow = 0; toRow < BOARD_ROWS; toRow++) {
-        for (let toCol = 0; toCol < BOARD_COLS; toCol++) {
-          // 跳过同一位置
-          if (fromRow === toRow && fromCol === toCol) {
-            continue;
-          }
-          
-          // 检查这个移动是否合法（基础规则 + 吃子规则）
-          // 注意：这里不需要递归检查高级规则（如是否导致对方无解），
-          // 只需要检查移动后己方是否不再被将军即可。
-          const basicResult = validateBasicMove(board, fromRow, fromCol, toRow, toCol, piece);
-          if (!basicResult.valid) {
-            continue;
-          }
-          
-          const captureResult = validateCapture(board, fromRow, fromCol, toRow, toCol, piece);
-          if (!captureResult.valid) {
-            continue;
-          }
-          
-          // 模拟这个移动
-          const tempBoard = board.map(row => [...row]);
-          tempBoard[toRow][toCol] = piece;
-          tempBoard[fromRow][fromCol] = PIECES.EMPTY;
-          
-          // 检查移动后是否还被将军
-          // 同时也需要检查是否违反“对将”规则，因为解将的移动也不能导致对将
-          if (!isInCheck(tempBoard, color) && !areKingsFacing(tempBoard)) {
-            // 找到一个可以解将的移动
-            return true;
-          }
-        }
-      }
-    }
-  }
-  
-  // 没有找到任何可以解将的移动
-  return false;
-}
-
-/**
  * 第二层扩展：叫将规则验证
- * 检查移动后是否形成对方无法解将的局面
+ * 检查当前行棋方是否在被将军状态，如果是，则必须解将
  * 
- * 根据需求：如果叫将后对方任何行棋都不能解将，则当前走棋不成立
+ * 规则：如果当前行棋方被将军，则只能执行能解除将军状态的着法
+ * - 吃掉攻击将/帅的棋子
+ * - 挡住攻击路线（蹩马腿、塞象眼等）
+ * - 移动将/帅到安全位置
  */
 function validateCheckRule(
   board: Board,
@@ -396,32 +341,29 @@ function validateCheckRule(
     return { valid: false, reason: '无效的棋子' };
   }
 
-  const opponentColor = moverColor === 'red' ? 'black' : 'red';
-
-  // 模拟移动后的棋盘状态
-  const tempBoard = board.map(row => [...row]);
-  tempBoard[toRow][toCol] = piece;
-  tempBoard[fromRow][fromCol] = PIECES.EMPTY;
-
-  // 检查移动后是否对对方叫将
-  const isGivingCheck = isInCheck(tempBoard, opponentColor);
+  // 检查当前行棋方是否正在被将军
+  const isCurrentlyInCheck = isInCheck(board, moverColor);
   
-  if (isGivingCheck) {
-    console.log(`⚠️  此移动对${opponentColor === 'red' ? '红方' : '黑方'}叫将`);
+  if (isCurrentlyInCheck) {
+    console.log(`⚠️  ${moverColor === 'red' ? '红方' : '黑方'}当前正在被将军，必须解将`);
     
-    // 检查对方是否有任何合法的着法可以解将
-    const hasEscapeMove = hasLegalEscapeMoves(tempBoard, opponentColor);
+    // 模拟移动后的棋盘状态
+    const tempBoard = board.map(row => [...row]);
+    tempBoard[toRow][toCol] = piece;
+    tempBoard[fromRow][fromCol] = PIECES.EMPTY;
     
-    if (!hasEscapeMove) {
-      // 对方无法解将，形成绝杀
-      // 根据需求：这种情况走棋不能成立
+    // 检查移动后是否还被将军
+    const stillInCheck = isInCheck(tempBoard, moverColor);
+    
+    if (stillInCheck) {
+      // 移动后仍然被将军，此着法不合法
       return { 
         valid: false, 
-        reason: `移动后对${opponentColor === 'red' ? '红方' : '黑方'}叫将，且对方无法解将（形成绝杀）` 
+        reason: `${moverColor === 'red' ? '红方' : '黑方'}正在被将军，此着法无法解将` 
       };
     }
     
-    console.log(`✅ 对方有解将的着法，叫将合法`);
+    console.log(`✅ 此着法成功解将`);
   }
 
   return { valid: true };
