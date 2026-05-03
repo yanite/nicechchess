@@ -433,7 +433,14 @@ function createPieces() {
           pieceMesh.rotation.y = -Math.PI / 2;
         }
         
-        pieceMesh.userData = { row, col, piece };
+        pieceMesh.userData = { 
+          row, 
+          col, 
+          piece,
+          owner: piece > 0 ? '红' : '黑',  // 归属方
+          pieceName: getPieceChineseName(piece),  // 棋子文字
+          isCaptured: false  // 初始为活子
+        };
         piecesGroup.add(pieceMesh);
       }
     }
@@ -452,105 +459,79 @@ function updatePieces() {
   const startX = -((BOARD_WIDTH - 1) * CELL_SIZE) / 2;
   const startZ = -((BOARD_HEIGHT - 1) * CELL_SIZE) / 2;
 
-  // 统计被吃掉的棋子数量（按颜色分类）
-  let capturedRedCount = 0; // 红方被吃棋子计数
-  let capturedBlackCount = 0; // 黑方被吃棋子计数
-  
-  // 第一遍遍历：统计哪些棋子被吃掉了
-  const capturedPieces: Array<{ child: THREE.Mesh; piece: number }> = [];
-  
+  // 创建一个标记数组，记录每个棋盘位置是否已经被分配
+  const positionAssigned: boolean[][] = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(false));
+
+  // 第一遍遍历：为棋盘上的棋子分配位置
   piecesGroup.children.forEach(child => {
     if (child instanceof THREE.Mesh) {
-      const { piece } = child.userData;
+      const { piece, isCaptured } = child.userData;
       
-      // 查找该棋子当前在棋盘上的位置
-      let found = false;
+      // 如果已经是死子，跳过
+      if (isCaptured) {
+        return;
+      }
       
-      for (let row = 0; row < BOARD_HEIGHT && !found; row++) {
-        for (let col = 0; col < BOARD_WIDTH && !found; col++) {
-          if (board[row][col] === piece) {
-            // 检查这个位置是否已经被其他同类型棋子占据
+      // 在棋盘上查找该棋子的位置
+      for (let row = 0; row < BOARD_HEIGHT; row++) {
+        for (let col = 0; col < BOARD_WIDTH; col++) {
+          // 检查这个位置是否有该类型的棋子，且未被分配
+          if (board[row][col] === piece && !positionAssigned[row][col]) {
+            // 检查这个位置是否已经被其他棋子占据
             let isOccupied = false;
             piecesGroup.children.forEach(other => {
               if (other !== child && other instanceof THREE.Mesh) {
                 const otherData = other.userData;
-                if (otherData.row === row && otherData.col === col) {
+                if (!otherData.isCaptured && otherData.row === row && otherData.col === col) {
                   isOccupied = true;
                 }
               }
             });
             
             if (!isOccupied) {
-              found = true;
+              // 分配位置
+              child.userData.row = row;
+              child.userData.col = col;
+              positionAssigned[row][col] = true;
+              return; // 找到位置后退出
             }
           }
-        }
-      }
-      
-      if (!found) {
-        // 这是一个被吃掉的棋子
-        capturedPieces.push({ child, piece });
-        if (piece > 0) {
-          capturedRedCount++;
-        } else {
-          capturedBlackCount++;
         }
       }
     }
   });
 
-  // 第二遍遍历：更新所有棋子的位置
-  let currentRedCapturedIndex = 0;
-  let currentBlackCapturedIndex = 0;
+  // 第二遍遍历：更新所有棋子的位置和状态
+  let capturedRedCount = 0; // 红方被吃棋子计数
+  let capturedBlackCount = 0; // 黑方被吃棋子计数
   
   piecesGroup.children.forEach(child => {
     if (child instanceof THREE.Mesh) {
-      const { piece } = child.userData;
+      const { piece, row, col, isCaptured } = child.userData;
       
-      // 查找该棋子当前在棋盘上的位置
-      let newRow = -1;
-      let newCol = -1;
-      let found = false;
-      
-      for (let row = 0; row < BOARD_HEIGHT && !found; row++) {
-        for (let col = 0; col < BOARD_WIDTH && !found; col++) {
-          if (board[row][col] === piece) {
-            // 检查这个位置是否已经被其他同类型棋子占据
-            let isOccupied = false;
-            piecesGroup.children.forEach(other => {
-              if (other !== child && other instanceof THREE.Mesh) {
-                const otherData = other.userData;
-                if (otherData.row === row && otherData.col === col) {
-                  isOccupied = true;
-                }
-              }
-            });
-            
-            if (!isOccupied) {
-              newRow = row;
-              newCol = col;
-              found = true;
-            }
-          }
+      // 检查该棋子是否还在棋盘上
+      let stillOnBoard = false;
+      if (!isCaptured && row >= 0 && col >= 0) {
+        // 检查棋盘上该位置是否还是这个棋子
+        if (board[row][col] === piece) {
+          stillOnBoard = true;
         }
       }
       
-      if (found && newRow >= 0 && newCol >= 0) {
+      if (stillOnBoard) {
         // 棋子在棋盘上，正常更新位置
-        child.position.x = startX + newCol * CELL_SIZE;
-        child.position.z = startZ + newRow * CELL_SIZE;
+        child.position.x = startX + col * CELL_SIZE;
+        child.position.z = startZ + row * CELL_SIZE;
         
         // 如果该棋子被选中，抬起一定距离
-        if (selectedPiece && selectedPiece[0] === newRow && selectedPiece[1] === newCol) {
+        if (selectedPiece && selectedPiece[0] === row && selectedPiece[1] === col) {
           child.position.y = 0.5; // 抬起 0.5 单位
         } else {
           child.position.y = 0; // 正常位置
         }
         
-        // 更新 userData
-        child.userData.row = newRow;
-        child.userData.col = newCol;
-        child.userData.isCaptured = false; // 标记为活子
+        // 确保标记为活子
+        child.userData.isCaptured = false;
       } else {
         // 棋子被吃掉，移到棋盘边缘
         const isRed = piece > 0;
@@ -558,19 +539,19 @@ function updatePieces() {
         if (isRed) {
           // 红方被吃的棋子放在棋盘左边
           const leftBoundary = startX - CELL_SIZE * 1.5; // 左边偏移1.5个棋子距离
-          const offsetZ = currentRedCapturedIndex * CELL_SIZE * 0.75; // 每次向下偏移0.75个棋子
+          const offsetZ = capturedRedCount * CELL_SIZE * 0.75; // 每次向下偏移0.75个棋子
           
           child.position.x = leftBoundary;
           child.position.z = startZ + offsetZ;
-          currentRedCapturedIndex++;
+          capturedRedCount++;
         } else {
           // 黑方被吃的棋子放在棋盘右边
           const rightBoundary = startX + (BOARD_WIDTH - 1) * CELL_SIZE + CELL_SIZE * 1.5; // 右边偏移1.5个棋子距离
-          const offsetZ = currentBlackCapturedIndex * CELL_SIZE * 0.75; // 每次向下偏移0.75个棋子
+          const offsetZ = capturedBlackCount * CELL_SIZE * 0.75; // 每次向下偏移0.75个棋子
           
           child.position.x = rightBoundary;
           child.position.z = startZ + offsetZ;
-          currentBlackCapturedIndex++;
+          capturedBlackCount++;
         }
         
         child.position.y = 0; // 放在棋盘平面上
