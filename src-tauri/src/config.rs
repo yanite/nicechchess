@@ -5,8 +5,10 @@ use std::path::PathBuf;
 /// 应用程序配置结构
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
-    /// 窗口位置和大?    pub window: WindowConfig,
-    /// AI 引擎配?    pub engine: EngineConfig,
+    /// 窗口位置和大小
+    pub window: WindowConfig,
+    /// AI 引擎配置
+    pub engine: EngineConfig,
     /// UI 配置
     pub ui: UIConfig,
 }
