@@ -10,12 +10,30 @@ const currentPlayerText = computed(() => {
   return chessStore.currentPlayer === 'red' ? '红方' : '黑方';
 });
 
-// 计算着法历史显示
+// 计算着法历史显示（按回合分组）
 const moveHistoryText = computed(() => {
-  return chessStore.moveHistory.map((move, index) => {
-    const moveNum = Math.floor(index / 2) + 1;
-    const side = index % 2 === 0 ? '红' : '黑';
-    return `${moveNum}. ${side}: ${move.uci}`;
+  const rounds: Array<{ num: number; red?: string; black?: string }> = [];
+  
+  chessStore.moveHistory.forEach((move, index) => {
+    const roundNum = Math.floor(index / 2) + 1;
+    
+    if (index % 2 === 0) {
+      // 红方着法
+      rounds.push({ num: roundNum, red: move.chineseNotation });
+    } else {
+      // 黑方着法，添加到上一个回合
+      if (rounds.length > 0) {
+        rounds[rounds.length - 1].black = move.chineseNotation;
+      }
+    }
+  });
+  
+  return rounds.map(round => {
+    if (round.black) {
+      return `${round.num}. ${round.red} ${round.black}`;
+    } else {
+      return `${round.num}. ${round.red}`;
+    }
   });
 });
 

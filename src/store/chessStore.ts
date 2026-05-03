@@ -8,7 +8,8 @@ import {
   boardToUCI,
   getPieceColor,
   BOARD_ROWS,
-  BOARD_COLS
+  BOARD_COLS,
+  generateChineseNotation
 } from '../logic/chess/constants';
 
 // 着法记录接口
@@ -18,6 +19,7 @@ export interface MoveRecord {
   piece: PieceType;        // 移动的棋子
   captured?: PieceType;    // 被吃掉的棋子（如果有）
   uci: string;             // UCI 格式着法
+  chineseNotation: string; // 中文着法，如 "红俥进二"
   timestamp: number;       // 时间戳
 }
 
@@ -95,12 +97,14 @@ export const useChessStore = defineStore('chess', () => {
     
     // 记录着法
     const uci = `${boardToUCI(fromRow, fromCol)}${boardToUCI(toRow, toCol)}`;
+    const chineseNotation = generateChineseNotation(board.value, fromRow, fromCol, toRow, toCol, piece);
     const moveRecord: MoveRecord = {
       from: [fromRow, fromCol],
       to: [toRow, toCol],
       piece,
       captured: captured !== PIECES.EMPTY ? captured : undefined,
       uci,
+      chineseNotation,
       timestamp: Date.now(),
     };
     moveHistory.value.push(moveRecord);
