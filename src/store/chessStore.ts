@@ -190,7 +190,8 @@ export const useChessStore = defineStore('chess', () => {
     }
     
     // 添加当前行棋方
-    fen += ` ${currentPlayer.value === 'red' ? 'w' : 'b'}`;
+    // 注意：Pikafish 使用 'r' 表示红方，'b' 表示黑方（而非国际象棋的 w/b）
+    fen += ` ${currentPlayer.value === 'red' ? 'r' : 'b'}`;
     
     // TODO: 添加其他 FEN 字段（易位、吃过路兵等）
     fen += ' - - 0 1';
