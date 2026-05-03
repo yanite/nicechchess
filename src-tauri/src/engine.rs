@@ -26,8 +26,9 @@ pub fn start_engine(state: State<EngineState>) -> Result<String, String> {
         }
     }
 
-    // Pikafish 引擎路径（相对于项目根目录）
-    let engine_path = "public/pikafish/pikafish-vnni512.exe";
+    // 从配置文件读取引擎路径
+    let config = crate::config::AppConfig::load()?;
+    let engine_path = &config.engine.pikafish_path;
     
     println!("正在启动引擎: {}", engine_path);
     println!("当前工作目录: {:?}", std::env::current_dir());
