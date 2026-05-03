@@ -122,6 +122,39 @@ export function getPieceColor(piece: PieceType): 'red' | 'black' | 'empty' {
 }
 
 /**
+ * 将内部着法转换为 UCI 格式
+ * @param fromRow 起始行
+ * @param fromCol 起始列
+ * @param toRow 目标行
+ * @param toCol 目标列
+ * @returns UCI 格式着法字符串 (如 "e2e4")
+ */
+export function moveToUCI(fromRow: number, fromCol: number, toRow: number, toCol: number): string {
+  const from = boardToUCI(fromRow, fromCol);
+  const to = boardToUCI(toRow, toCol);
+  return from + to;
+}
+
+/**
+ * 将 UCI 格式着法转换为内部坐标
+ * @param uciMove UCI 格式着法字符串 (如 "e2e4")
+ * @returns [fromRow, fromCol, toRow, toCol] 数组
+ */
+export function UCIToMove(uciMove: string): [number, number, number, number] {
+  if (uciMove.length < 4) {
+    throw new Error(`Invalid UCI move: ${uciMove}`);
+  }
+  
+  const fromSquare = uciMove.substring(0, 2);
+  const toSquare = uciMove.substring(2, 4);
+  
+  const [fromRow, fromCol] = UCIToBoard(fromSquare);
+  const [toRow, toCol] = UCIToBoard(toSquare);
+  
+  return [fromRow, fromCol, toRow, toCol];
+}
+
+/**
  * 将棋盘坐标转换为中文数字（用于着法记录）
  * @param col 列号 (0-8)
  * @returns 中文数字字符串
