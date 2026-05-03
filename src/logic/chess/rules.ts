@@ -1,4 +1,4 @@
-import { type Board, type PieceType, PIECES, BOARD_ROWS, BOARD_COLS } from './constants';
+import { type Board, type PieceType, PIECES, BOARD_ROWS, BOARD_COLS, PIECE_NAMES } from './constants';
 
 /**
  * 获取棋子的颜色
@@ -320,6 +320,114 @@ function validateCapture(
 }
 
 /**
+ * 检查指定颜色是否有合法的着法可以解除将军状态
+ * @param board 棋盘状态
+ * @param color 颜色
+ * @returns 是否有合法的解将着法
+ */
+function hasLegalEscapeMoves(board: Board, color: 'red' | 'black'): boolean {
+  // 遍历该颜色的所有棋子
+  for (let fromRow = 0; fromRow < BOARD_ROWS; fromRow++) {
+    for (let fromCol = 0; fromCol < BOARD_COLS; fromCol++) {
+      const piece = board[fromRow][fromCol];
+      
+      // 跳过空位和对方的棋子
+      if (piece === PIECES.EMPTY || getPieceColor(piece) !== color) {
+        continue;
+      }
+      
+      // 尝试所有可能的目标位置
+      for (let toRow = 0; toRow < BOARD_ROWS; toRow++) {
+        for (let toCol = 0; toCol < BOARD_COLS; toCol++) {
+          // 跳过同一位置
+          if (fromRow === toRow && fromCol === toCol) {
+            continue;
+          }
+          
+          // 检查这个移动是否合法（基础规则 + 吃子规则）
+          // 注意：这里不需要递归检查高级规则（如是否导致对方无解），
+          // 只需要检查移动后己方是否不再被将军即可。
+          const basicResult = validateBasicMove(board, fromRow, fromCol, toRow, toCol, piece);
+          if (!basicResult.valid) {
+            continue;
+          }
+          
+          const captureResult = validateCapture(board, fromRow, fromCol, toRow, toCol, piece);
+          if (!captureResult.valid) {
+            continue;
+          }
+          
+          // 模拟这个移动
+          const tempBoard = board.map(row => [...row]);
+          tempBoard[toRow][toCol] = piece;
+          tempBoard[fromRow][fromCol] = PIECES.EMPTY;
+          
+          // 检查移动后是否还被将军
+          // 同时也需要检查是否违反“对将”规则，因为解将的移动也不能导致对将
+          if (!isInCheck(tempBoard, color) && !areKingsFacing(tempBoard)) {
+            // 找到一个可以解将的移动
+            return true;
+          }
+        }
+      }
+    }
+  }
+  
+  // 没有找到任何可以解将的移动
+  return false;
+}
+
+/**
+ * 第二层扩展：叫将规则验证
+ * 检查移动后是否形成对方无法解将的局面
+ * 
+ * 根据需求：如果叫将后对方任何行棋都不能解将，则当前走棋不成立
+ */
+function validateCheckRule(
+  board: Board,
+  fromRow: number,
+  fromCol: number,
+  toRow: number,
+  toCol: number,
+  piece: PieceType
+): { valid: boolean; reason?: string } {
+  const moverColor = getPieceColor(piece);
+  if (!moverColor) {
+    return { valid: false, reason: '无效的棋子' };
+  }
+
+  const opponentColor = moverColor === 'red' ? 'black' : 'red';
+
+  // 模拟移动后的棋盘状态
+  const tempBoard = board.map(row => [...row]);
+  tempBoard[toRow][toCol] = piece;
+  tempBoard[fromRow][fromCol] = PIECES.EMPTY;
+
+  // 检查移动后是否对对方叫将
+  const isGivingCheck = isInCheck(tempBoard, opponentColor);
+  
+  if (isGivingCheck) {
+    console.log(`⚠️  此移动对${opponentColor === 'red' ? '红方' : '黑方'}叫将`);
+    
+    // 检查对方是否有任何合法的着法可以解将
+    const hasEscapeMove = hasLegalEscapeMoves(tempBoard, opponentColor);
+    
+    if (!hasEscapeMove) {
+      // 对方无法解将，形成绝杀
+      // 根据需求：这种情况走棋不能成立
+      return { 
+        valid: false, 
+        reason: `移动后对${opponentColor === 'red' ? '红方' : '黑方'}叫将，且对方无法解将（形成绝杀）` 
+      };
+    }
+    
+    console.log(`✅ 对方有解将的着法，叫将合法`);
+  }
+
+  return { valid: true };
+}
+
+/**
  * 检查两将是否面对面
  */
 function areKingsFacing(board: Board): boolean {
@@ -401,7 +509,7 @@ function validateAdvancedRules(
 }
 
 /**
- * 验证移动是否合法
+ * 验证移动是否合法（完整验证）
  * @param board 当前棋盘状态
  * @param fromRow 起始行
  * @param fromCol 起始列
@@ -418,38 +526,59 @@ export function isValidMove(
 ): boolean {
   // 基本检查：不能移动到同一个位置
   if (fromRow === toRow && fromCol === toCol) {
+    console.log('❌ 规则验证失败：不能移动到同一位置');
     return false;
   }
 
   // 检查起始位置是否有棋子
   const piece = board[fromRow][fromCol];
   if (piece === PIECES.EMPTY) {
+    console.log('❌ 规则验证失败：起始位置没有棋子');
     return false;
   }
 
   // 检查目标位置是否在棋盘内
   if (!isInBoard(toRow, toCol)) {
+    console.log('❌ 规则验证失败：目标位置超出棋盘范围');
     return false;
   }
+
+  const pieceName = PIECE_NAMES[piece] || '?';
+  console.log(`\n🔍 开始验证移动：${pieceName} (${fromRow},${fromCol}) → (${toRow},${toCol})`);
 
   // 第一层：基础移动规则
   const basicResult = validateBasicMove(board, fromRow, fromCol, toRow, toCol, piece);
   if (!basicResult.valid) {
+    console.log(`❌ 第一层验证失败（基础移动规则）：${basicResult.reason}`);
     return false;
   }
+  console.log('✅ 第一层验证通过（基础移动规则）');
 
-  // 第二层：吃子规则
+  // 第二层：吃子规则和叫将规则
   const captureResult = validateCapture(board, fromRow, fromCol, toRow, toCol, piece);
   if (!captureResult.valid) {
+    console.log(`❌ 第二层验证失败（吃子规则）：${captureResult.reason}`);
     return false;
   }
+  console.log('✅ 第二层验证通过（吃子规则）');
+
+  // 第二层扩展：检查是否叫将且无法解将
+  const checkResult = validateCheckRule(board, fromRow, fromCol, toRow, toCol, piece);
+  if (!checkResult.valid) {
+    console.log(`❌ 第二层验证失败（叫将规则）：${checkResult.reason}`);
+    return false;
+  }
+  console.log('✅ 第二层验证通过（叫将规则）');
 
   // 第三层：高级规则
   const advancedResult = validateAdvancedRules(board, fromRow, fromCol, toRow, toCol, piece);
   if (!advancedResult.valid) {
+    console.log(`❌ 第三层验证失败（高级规则）：${advancedResult.reason}`);
     return false;
   }
+  console.log('✅ 第三层验证通过（高级规则）');
 
+  console.log(`✅ 移动验证通过：${pieceName} (${fromRow},${fromCol}) → (${toRow},${toCol})\n`);
   return true;
 }
 
