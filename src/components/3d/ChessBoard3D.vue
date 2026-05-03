@@ -191,27 +191,57 @@ function drawBoardLines() {
     boardGroup.add(line);
   });
 
-  // 绘制楚河汉界（在第 4 行和第 5 行之间）
+  // 绘制楚河汉界文字（在第 4 行和第 5 行之间）
   const riverY = startZ + 4.5 * CELL_SIZE;
   
-  // 绘制两条平行线表示楚河汉界
-  const riverOffset = 0.15; // 两条线的偏移量
+  // 创建文字纹理
+  const createTextTexture = (text: string) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    
+    // 透明背景
+    ctx.fillStyle = 'rgba(0, 0, 0, 0)';
+    ctx.fillRect(0, 0, 128, 128);
+    
+    // 绘制文字
+    ctx.font = 'bold 80px "KaiTi", "STKaiti", serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#000000';
+    ctx.fillText(text, 64, 64);
+    
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.needsUpdate = true;
+    return texture;
+  };
   
-  // 第一条线
-  const riverPoints1 = [];
-  riverPoints1.push(new THREE.Vector3(startX, 0.01, riverY - riverOffset));
-  riverPoints1.push(new THREE.Vector3(startX + (BOARD_WIDTH - 1) * CELL_SIZE, 0.01, riverY - riverOffset));
-  const riverGeometry1 = new THREE.BufferGeometry().setFromPoints(riverPoints1);
-  const riverLine1 = new THREE.Line(riverGeometry1, lineMaterial);
-  boardGroup.add(riverLine1);
+  // 在棋盘上分散放置"楚河汉界"四个字
+  const riverTexts = ['楚', '河', '汉', '界'];
+  const textSpacing = (BOARD_WIDTH - 1) * CELL_SIZE / 5; // 平均分布
   
-  // 第二条线
-  const riverPoints2 = [];
-  riverPoints2.push(new THREE.Vector3(startX, 0.01, riverY + riverOffset));
-  riverPoints2.push(new THREE.Vector3(startX + (BOARD_WIDTH - 1) * CELL_SIZE, 0.01, riverY + riverOffset));
-  const riverGeometry2 = new THREE.BufferGeometry().setFromPoints(riverPoints2);
-  const riverLine2 = new THREE.Line(riverGeometry2, lineMaterial);
-  boardGroup.add(riverLine2);
+  riverTexts.forEach((char, index) => {
+    const texture = createTextTexture(char);
+    if (!texture) return;
+    
+    // 创建平面几何体显示文字
+    const textGeometry = new THREE.PlaneGeometry(CELL_SIZE * 0.8, CELL_SIZE * 0.8);
+    const textMaterial = new THREE.MeshBasicMaterial({ 
+      map: texture, 
+      transparent: true,
+      side: THREE.DoubleSide
+    });
+    const textMesh = new THREE.Mesh(textGeometry, textMaterial);
+    
+    // 计算位置：均匀分布在楚河汉界区域
+    const xPos = startX + (index + 1) * textSpacing;
+    textMesh.position.set(xPos, 0.02, riverY);
+    textMesh.rotation.x = -Math.PI / 2; // 水平放置
+    
+    boardGroup.add(textMesh);
+  });
 }
 
 /**
