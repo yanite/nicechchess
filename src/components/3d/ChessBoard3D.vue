@@ -1,5 +1,5 @@
 <template>
-  <div ref="container" class="chess-board-3d">
+  <div ref="container" class="chess-board-3d" @click="hideCheckAlert">
     <!-- 将军/绝杀提示图片 -->
     <div v-if="showCheckAlert" class="check-alert">
       <img :src="alertImage" alt="提示" class="alert-image" />
@@ -931,6 +931,21 @@ function onWindowResize() {
   lineMaterials.forEach(material => {
     material.resolution.set(width, height);
   });
+}
+
+/**
+ * 隐藏将军/绝杀提示
+ */
+function hideCheckAlert() {
+  if (showCheckAlert.value) {
+    // 清除定时器
+    if (alertTimer !== null) {
+      clearTimeout(alertTimer);
+      alertTimer = null;
+    }
+    // 隐藏提示
+    showCheckAlert.value = false;
+  }
 }
 
 // 生命周期钩子
