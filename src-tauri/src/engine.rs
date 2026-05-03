@@ -103,17 +103,43 @@ pub fn get_best_move(
 fn send_uci_command(state: &State<EngineState>) -> Result<(), String> {
     let mut process_guard = state.process.lock().map_err(|e| format!("锁定失败: {}", e))?;
     if let Some(ref mut child) = *process_guard {
+        if let Some(mut stdin) = child.stdin.take() {
+            use std::io::Write;
+            
+            // 发送 uci 命令
+            stdin.write_all(b"uci\n").map_err(|e| format!("发送 UCI 命令失败: {}", e))?;
+            stdin.flush().map_err(|e| format!("刷新缓冲区失败: {}", e))?;
+            
+            // 重新获取 stdin
+            child.stdin = Some(stdin);
+            
+            // 读取响应直到 uciok
+            if let Some(stdout) = &mut child.stdout {
+                use std::io::BufRead;
+                let reader = std::io::BufReader::new(stdout);
+                for line in reader.lines() {
+                    match line {
+                        Ok(l) => {
+                            println!("引擎响应: {}", l);
+                            if l.trim() == "uciok" {
+                                break;
+                            }
+                        }
+                        Err(e) => {
+                            return Err(format!("读取引擎响应失败: {}", e));
+                        }
+                    }
+                }
+            }
+            
+            // 发送 isready 命令
             if let Some(mut stdin) = child.stdin.take() {
                 use std::io::Write;
-                
-                // 发送 uci 命令
-                stdin.write_all(b"uci\n").map_err(|e| format!("发送 UCI 命令失败: {}", e))?;
+                stdin.write_all(b"isready\n").map_err(|e| format!("发送 isready 命令失败: {}", e))?;
                 stdin.flush().map_err(|e| format!("刷新缓冲区失败: {}", e))?;
-                
-                // 重新获取 stdin
                 child.stdin = Some(stdin);
                 
-                // 读取响应直到 uciok
+                // 读取响应直到 readyok
                 if let Some(stdout) = &mut child.stdout {
                     use std::io::BufRead;
                     let reader = std::io::BufReader::new(stdout);
@@ -121,39 +147,12 @@ fn send_uci_command(state: &State<EngineState>) -> Result<(), String> {
                         match line {
                             Ok(l) => {
                                 println!("引擎响应: {}", l);
-                                if l.trim() == "uciok" {
+                                if l.trim() == "readyok" {
                                     break;
                                 }
                             }
                             Err(e) => {
                                 return Err(format!("读取引擎响应失败: {}", e));
-                            }
-                        }
-                    }
-                }
-                
-                // 发送 isready 命令
-                if let Some(mut stdin) = child.stdin.take() {
-                    use std::io::Write;
-                    stdin.write_all(b"isready\n").map_err(|e| format!("发送 isready 命令失败: {}", e))?;
-                    stdin.flush().map_err(|e| format!("刷新缓冲区失败: {}", e))?;
-                    child.stdin = Some(stdin);
-                    
-                    // 读取响应直到 readyok
-                    if let Some(stdout) = &mut child.stdout {
-                        use std::io::BufRead;
-                        let reader = std::io::BufReader::new(stdout);
-                        for line in reader.lines() {
-                            match line {
-                                Ok(l) => {
-                                    println!("引擎响应: {}", l);
-                                    if l.trim() == "readyok" {
-                                        break;
-                                    }
-                                }
-                                Err(e) => {
-                                    return Err(format!("读取引擎响应失败: {}", e));
-                                }
                             }
                         }
                     }
