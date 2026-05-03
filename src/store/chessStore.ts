@@ -6,7 +6,9 @@ import {
   type Board, 
   type PieceType,
   boardToUCI,
-  getPieceColor 
+  getPieceColor,
+  BOARD_HEIGHT,
+  BOARD_WIDTH
 } from '../logic/chess/constants';
 
 // 着法记录接口
