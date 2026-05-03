@@ -166,6 +166,7 @@ fn send_uci_command(state: &State<EngineState>) -> Result<(), String> {
 
 /// 设置局面
 fn set_position(child: &mut Child, fen: &str) -> Result<(), String> {
+    println!("发送 position 命令，FEN: {}", fen);
     if let Some(mut stdin) = child.stdin.take() {
         use std::io::Write;
         let command = format!("position fen {}\n", fen);
