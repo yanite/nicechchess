@@ -90,24 +90,31 @@ export function initBoard(): Board {
 
 /**
  * 坐标转换：棋盘坐标转 UCI 坐标
- * @param row 行 (0-9)
- * @param col 列 (0-8)
- * @returns UCI 坐标字符串 (如 "a1", "i9")
+ * @param row 行 (0-9)，0=黑方底线，9=红方底线
+ * @param col 列 (0-8)，0=a列，8=i列
+ * @returns UCI 坐标字符串 (如 "a0", "i9")
+ * 
+ * 注意：UCI 协议中 row=0 是红方底线，row=9 是黑方底线
+ * 而内部坐标系 row=0 是黑方，row=9 是红方，需要反转
  */
 export function boardToUCI(row: number, col: number): string {
   const files = 'abcdefghi';
-  const ranks = row.toString();
-  return files[col] + ranks;
+  const uciRow = 9 - row;  // 反转行号：内部row=9(红方) → UCI row=0
+  return files[col] + uciRow.toString();
 }
 
 /**
  * 坐标转换：UCI 坐标转棋盘坐标
- * @param uci UCI 坐标字符串 (如 "a1", "i9")
+ * @param uci UCI 坐标字符串 (如 "a0", "i9")
  * @returns [row, col] 数组
+ * 
+ * 注意：UCI 协议中 row=0 是红方底线，row=9 是黑方底线
+ * 而内部坐标系 row=0 是黑方，row=9 是红方，需要反转
  */
 export function UCIToBoard(uci: string): [number, number] {
   const col = uci.charCodeAt(0) - 'a'.charCodeAt(0);
-  const row = parseInt(uci[1]);
+  const uciRow = parseInt(uci[1]);
+  const row = 9 - uciRow;  // 反转行号：UCI row=0 → 内部row=9(红方)
   return [row, col];
 }
 
