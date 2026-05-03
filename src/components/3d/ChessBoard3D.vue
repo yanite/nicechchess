@@ -361,25 +361,12 @@ function drawPieceMarkers(startX: number, startZ: number) {
 }
 
 /**
- * 创建棋子
+ * 创建所有棋子（只在初始化时调用一次）
  */
 function createPieces() {
   piecesGroup = new THREE.Group();
-  updatePieces();
-  scene.add(piecesGroup);
-}
-
-/**
- * 更新棋子位置
- */
-function updatePieces() {
-  // 清除现有棋子
-  while (piecesGroup.children.length > 0) {
-    piecesGroup.remove(piecesGroup.children[0]);
-  }
-
+  
   const board = chessStore.board;
-  const selectedPiece = chessStore.selectedPiece;
   // 棋盘线的起始位置（与 drawBoardLines 保持一致）
   const startX = -((BOARD_WIDTH - 1) * CELL_SIZE) / 2;
   const startZ = -((BOARD_HEIGHT - 1) * CELL_SIZE) / 2;
@@ -393,13 +380,7 @@ function updatePieces() {
         // 棋子应该放在棋盘线的交叉点上
         pieceMesh.position.x = startX + col * CELL_SIZE;
         pieceMesh.position.z = startZ + row * CELL_SIZE;
-        
-        // 如果该棋子被选中，抬起一定距离
-        if (selectedPiece && selectedPiece[0] === row && selectedPiece[1] === col) {
-          pieceMesh.position.y = 0.5; // 抬起 0.5 单位
-        } else {
-          pieceMesh.position.y = 0; // 正常位置
-        }
+        pieceMesh.position.y = 0; // 正常位置
         
         // 设置棋子文字朝向：都朝向楚河汉界（棋盘中心）
         // 黑方在上方（row 0-4），文字需要旋转 -90 度
@@ -424,6 +405,77 @@ function updatePieces() {
       }
     }
   }
+  
+  scene.add(piecesGroup);
+}
+
+/**
+ * 更新棋子位置和状态（不清除棋子，只更新位置）
+ */
+function updatePieces() {
+  const board = chessStore.board;
+  const selectedPiece = chessStore.selectedPiece;
+  // 棋盘线的起始位置（与 drawBoardLines 保持一致）
+  const startX = -((BOARD_WIDTH - 1) * CELL_SIZE) / 2;
+  const startZ = -((BOARD_HEIGHT - 1) * CELL_SIZE) / 2;
+
+  // 遍历所有现有棋子，更新它们的位置和状态
+  piecesGroup.children.forEach(child => {
+    if (child instanceof THREE.Mesh) {
+      const { row: oldRow, col: oldCol, piece } = child.userData;
+      
+      // 查找该棋子当前在棋盘上的位置
+      let newRow = -1;
+      let newCol = -1;
+      let found = false;
+      
+      for (let row = 0; row < BOARD_HEIGHT && !found; row++) {
+        for (let col = 0; col < BOARD_WIDTH && !found; col++) {
+          if (board[row][col] === piece) {
+            // 检查这个位置是否已经被其他同类型棋子占据
+            // 通过检查是否有其他棋子的 userData 指向这个位置
+            let isOccupied = false;
+            piecesGroup.children.forEach(other => {
+              if (other !== child && other instanceof THREE.Mesh) {
+                const otherData = other.userData;
+                if (otherData.row === row && otherData.col === col) {
+                  isOccupied = true;
+                }
+              }
+            });
+            
+            if (!isOccupied) {
+              newRow = row;
+              newCol = col;
+              found = true;
+            }
+          }
+        }
+      }
+      
+      if (found && newRow >= 0 && newCol >= 0) {
+        // 更新棋子位置
+        child.position.x = startX + newCol * CELL_SIZE;
+        child.position.z = startZ + newRow * CELL_SIZE;
+        
+        // 如果该棋子被选中，抬起一定距离
+        if (selectedPiece && selectedPiece[0] === newRow && selectedPiece[1] === newCol) {
+          child.position.y = 0.5; // 抬起 0.5 单位
+        } else {
+          child.position.y = 0; // 正常位置
+        }
+        
+        // 更新 userData
+        child.userData.row = newRow;
+        child.userData.col = newCol;
+      } else {
+        // 棋子被吃掉，移到棋盘外
+        child.position.x = 100; // 移到很远的地方
+        child.position.z = 100;
+        child.position.y = -100;
+      }
+    }
+  });
 }
 
 /**
