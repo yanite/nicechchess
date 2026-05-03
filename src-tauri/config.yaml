@@ -1,0 +1,9 @@
+window:
+  x: 1288
+  y: 77
+  width: 1435
+  height: 1281
+engine:
+  pikafish_path: public/pikafish/pikafish-vnni512.exe
+ui:
+  board_texture: src/assets/textures/tx1/dark_wood_diff_1k.jpg
