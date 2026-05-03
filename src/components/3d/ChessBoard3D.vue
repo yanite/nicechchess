@@ -466,9 +466,9 @@ function createPieceTexture(piece: PieceType, isRed: boolean): THREE.CanvasTextu
  */
 function getPieceChineseName(piece: PieceType): string {
   const names: Record<number, string> = {
-    1: '帅',   // 红帅
-    2: '车',   // 红车
-    3: '马',   // 红马
+    1: '帥',   // 红帅（繁体）
+    2: '俥',   // 红车（繁体）
+    3: '傌',   // 红马（繁体）
     4: '炮',   // 红炮
     5: '仕',   // 红仕
     6: '相',   // 红相
