@@ -379,6 +379,7 @@ function updatePieces() {
   }
 
   const board = chessStore.board;
+  const selectedPiece = chessStore.selectedPiece;
   // 棋盘线的起始位置（与 drawBoardLines 保持一致）
   const startX = -((BOARD_WIDTH - 1) * CELL_SIZE) / 2;
   const startZ = -((BOARD_HEIGHT - 1) * CELL_SIZE) / 2;
@@ -392,6 +393,13 @@ function updatePieces() {
         // 棋子应该放在棋盘线的交叉点上
         pieceMesh.position.x = startX + col * CELL_SIZE;
         pieceMesh.position.z = startZ + row * CELL_SIZE;
+        
+        // 如果该棋子被选中，抬起一定距离
+        if (selectedPiece && selectedPiece[0] === row && selectedPiece[1] === col) {
+          pieceMesh.position.y = 0.5; // 抬起 0.5 单位
+        } else {
+          pieceMesh.position.y = 0; // 正常位置
+        }
         
         // 设置棋子文字朝向：都朝向楚河汉界（棋盘中心）
         // 黑方在上方（row 0-4），文字需要旋转 -90 度
@@ -563,46 +571,12 @@ function onMouseClick(event: MouseEvent) {
     } else {
       // 否则选择该棋子
       chessStore.selectPiece(row, col);
-      
-      // 高亮选中的棋子
-      highlightPiece(selectedObject);
+      // updatePieces() 会通过 watch 自动调用，抬起选中的棋子
     }
   } else {
     // 点击空白处，取消选择
     chessStore.selectPiece(-1, -1);
-  }
-}
-
-/**
- * 高亮选中的棋子
- */
-function highlightPiece(mesh: THREE.Object3D) {
-  // 重置所有棋子颜色
-  piecesGroup.children.forEach(child => {
-    if (child instanceof THREE.Mesh) {
-      const materials = Array.isArray(child.material) ? child.material : [child.material];
-      const isRed = child.userData.piece > 0;
-      
-      // 更新所有材质的颜色
-      materials.forEach(mat => {
-        if (mat instanceof THREE.MeshStandardMaterial) {
-          mat.color.setHex(isRed ? 0xFF0000 : 0x000000);
-          mat.emissive.setHex(0x000000);
-        }
-      });
-    }
-  });
-  
-  // 高亮当前选中的棋子
-  if (mesh instanceof THREE.Mesh) {
-    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-    
-    // 为选中棋子添加发光效果
-    materials.forEach(mat => {
-      if (mat instanceof THREE.MeshStandardMaterial) {
-        mat.emissive.setHex(0x444444);
-      }
-    });
+    // updatePieces() 会通过 watch 自动调用，放下所有棋子
   }
 }
 
