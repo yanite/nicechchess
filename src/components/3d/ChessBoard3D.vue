@@ -248,21 +248,21 @@ function updatePieces() {
         pieceMesh.position.z = startZ + row * CELL_SIZE;
         
         // 设置棋子文字朝向：都朝向楚河汉界（棋盘中心）
-        // 黑方在上方（row 0-4），文字需要朝下（朝向楚河汉界）→ 旋转 180 度
-        // 红方在下方（row 5-9），文字需要朝上（朝向楚河汉界）→ 不旋转
+        // 黑方在上方（row 0-4），文字需要旋转 -90 度
+        // 红方在下方（row 5-9），文字需要旋转 90 度
         const isRed = piece > 0;
         if (!isRed && row < 5) {
-          // 黑方棋子在上半部分，文字需要朝下（朝向楚河汉界）
-          pieceMesh.rotation.y = Math.PI;  // 旋转 180 度
+          // 黑方棋子在上半部分，旋转 -90 度
+          pieceMesh.rotation.y = -Math.PI / 2;
         } else if (isRed && row >= 5) {
-          // 红方棋子在下半部分，文字需要朝上（朝向楚河汉界）
-          pieceMesh.rotation.y = 0;  // 不旋转
+          // 红方棋子在下半部分，旋转 90 度
+          pieceMesh.rotation.y = Math.PI / 2;
         } else if (!isRed && row >= 5) {
-          // 黑方棋子在下半部分（特殊情况），文字朝上
-          pieceMesh.rotation.y = 0;
+          // 黑方棋子在下半部分（特殊情况），旋转 90 度
+          pieceMesh.rotation.y = Math.PI / 2;
         } else {
-          // 红方棋子在上半部分（特殊情况），文字朝下
-          pieceMesh.rotation.y = Math.PI;
+          // 红方棋子在上半部分（特殊情况），旋转 -90 度
+          pieceMesh.rotation.y = -Math.PI / 2;
         }
         
         pieceMesh.userData = { row, col, piece };
