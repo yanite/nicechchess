@@ -242,6 +242,74 @@ function drawBoardLines() {
     
     boardGroup.add(textMesh);
   });
+
+  // 绘制兵、卒、炮位置的位标（十字准星标记）
+  drawPieceMarkers(startX, startZ);
+}
+
+/**
+ * 绘制兵、卒、炮位置的位标
+ */
+function drawPieceMarkers(startX: number, startZ: number) {
+  const markerMaterial = new THREE.LineBasicMaterial({ color: 0x000000 });
+  const markerSize = 0.15; // 位标拐线长度
+
+  // 定义需要绘制位标的位置（col, row）
+  const markerPositions = [
+    // 红方兵位 (1,3), (3,3), (5,3), (7,3), (9,3) → 对应索引 (0,6), (2,6), (4,6), (6,6), (8,6)
+    [0, 6], [2, 6], [4, 6], [6, 6], [8, 6],
+    // 红方炮位 (2,2), (8,2) → 对应索引 (1,7), (7,7)
+    [1, 7], [7, 7],
+    // 黑方卒位 (9,6), (7,6), (5,6), (3,6), (1,6) → 对应索引 (8,3), (6,3), (4,3), (2,3), (0,3)
+    [8, 3], [6, 3], [4, 3], [2, 3], [0, 3],
+    // 黑方炮位 (8,7), (2,7) → 对应索引 (7,2), (1,2)
+    [7, 2], [1, 2],
+  ];
+
+  markerPositions.forEach(([col, row]) => {
+    const x = startX + col * CELL_SIZE;
+    const z = startZ + row * CELL_SIZE;
+
+    // 左上角拐线
+    const leftTopPoints = [
+      new THREE.Vector3(x - markerSize, 0.01, z - markerSize / 2),
+      new THREE.Vector3(x - markerSize / 2, 0.01, z - markerSize / 2),
+      new THREE.Vector3(x - markerSize / 2, 0.01, z - markerSize),
+    ];
+    const leftTopGeometry = new THREE.BufferGeometry().setFromPoints(leftTopPoints);
+    const leftTopLine = new THREE.Line(leftTopGeometry, markerMaterial);
+    boardGroup.add(leftTopLine);
+
+    // 右上角拐线
+    const rightTopPoints = [
+      new THREE.Vector3(x + markerSize / 2, 0.01, z - markerSize),
+      new THREE.Vector3(x + markerSize / 2, 0.01, z - markerSize / 2),
+      new THREE.Vector3(x + markerSize, 0.01, z - markerSize / 2),
+    ];
+    const rightTopGeometry = new THREE.BufferGeometry().setFromPoints(rightTopPoints);
+    const rightTopLine = new THREE.Line(rightTopGeometry, markerMaterial);
+    boardGroup.add(rightTopLine);
+
+    // 左下角拐线
+    const leftBottomPoints = [
+      new THREE.Vector3(x - markerSize, 0.01, z + markerSize / 2),
+      new THREE.Vector3(x - markerSize / 2, 0.01, z + markerSize / 2),
+      new THREE.Vector3(x - markerSize / 2, 0.01, z + markerSize),
+    ];
+    const leftBottomGeometry = new THREE.BufferGeometry().setFromPoints(leftBottomPoints);
+    const leftBottomLine = new THREE.Line(leftBottomGeometry, markerMaterial);
+    boardGroup.add(leftBottomLine);
+
+    // 右下角拐线
+    const rightBottomPoints = [
+      new THREE.Vector3(x + markerSize / 2, 0.01, z + markerSize),
+      new THREE.Vector3(x + markerSize / 2, 0.01, z + markerSize / 2),
+      new THREE.Vector3(x + markerSize, 0.01, z + markerSize / 2),
+    ];
+    const rightBottomGeometry = new THREE.BufferGeometry().setFromPoints(rightBottomPoints);
+    const rightBottomLine = new THREE.Line(rightBottomGeometry, markerMaterial);
+    boardGroup.add(rightBottomLine);
+  });
 }
 
 /**
