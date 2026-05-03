@@ -134,6 +134,7 @@ fn send_uci_command(state: &State<EngineState>) -> Result<(), String> {
                 
                 // 发送 isready 命令
                 if let Some(mut stdin) = child.stdin.take() {
+                    use std::io::Write;
                     stdin.write_all(b"isready\n").map_err(|e| format!("发送 isready 命令失败: {}", e))?;
                     stdin.flush().map_err(|e| format!("刷新缓冲区失败: {}", e))?;
                     child.stdin = Some(stdin);
