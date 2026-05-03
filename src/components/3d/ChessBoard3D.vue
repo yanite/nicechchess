@@ -404,6 +404,9 @@ function createPieces() {
   const startX = -((BOARD_WIDTH - 1) * CELL_SIZE) / 2;
   const startZ = -((BOARD_HEIGHT - 1) * CELL_SIZE) / 2;
 
+  // 记录每种棋子的计数，用于生成唯一编号
+  const pieceCounter: Record<string, number> = {};
+
   // 遍历棋盘，创建棋子
   for (let row = 0; row < BOARD_HEIGHT; row++) {
     for (let col = 0; col < BOARD_WIDTH; col++) {
@@ -433,12 +436,26 @@ function createPieces() {
           pieceMesh.rotation.y = -Math.PI / 2;
         }
         
+        // 生成唯一编号：颜色 + 棋子名称 + 序号
+        const pieceName = getPieceChineseName(piece);
+        const colorPrefix = isRed ? '红' : '黑';
+        const key = `${colorPrefix}${pieceName}`;
+        
+        // 增加计数器
+        if (!pieceCounter[key]) {
+          pieceCounter[key] = 0;
+        }
+        pieceCounter[key]++;
+        
+        const uniqueId = `${key}${pieceCounter[key]}`; // 例如：黑卒1、红兵1
+        
         pieceMesh.userData = { 
           row, 
           col, 
           piece,
-          owner: piece > 0 ? '红' : '黑',  // 归属方
-          pieceName: getPieceChineseName(piece),  // 棋子文字
+          owner: isRed ? '红' : '黑',  // 归属方
+          pieceName: pieceName,  // 棋子文字
+          uniqueId: uniqueId,  // 唯一编号
           isCaptured: false  // 初始为活子
         };
         piecesGroup.add(pieceMesh);
@@ -704,71 +721,91 @@ function executeMove(fromRow: number, fromCol: number, toRow: number, toCol: num
     return;
   }
   
+  // 确保 draggedPiece 存在
+  if (!draggedPiece) {
+    console.error('draggedPiece 不存在');
+    return;
+  }
+  
   // 2. 如果目标位置有棋子，将目标棋子设置为死子并移到棋盘边上
   const targetPiece = board[toRow][toCol];
   if (targetPiece !== PIECES.EMPTY) {
-    // 找到目标位置的棋子
+    // 找到目标位置的棋子（通过位置精确匹配）
+    let targetMesh: THREE.Mesh | null = null;
     piecesGroup.children.forEach(child => {
       if (child instanceof THREE.Mesh) {
         const { row, col, isCaptured } = child.userData;
         // 找到目标位置且未被吃掉的棋子
         if (row === toRow && col === toCol && !isCaptured) {
-          // 标记为死子
-          child.userData.isCaptured = true;
-          child.userData.row = -1;
-          child.userData.col = -1;
-          
-          // 移到棋盘边缘
-          const startX = -((BOARD_WIDTH - 1) * CELL_SIZE) / 2;
-          const startZ = -((BOARD_HEIGHT - 1) * CELL_SIZE) / 2;
-          const isRed = targetPiece > 0;
-          
-          // 统计该颜色已被吃的棋子数量
-          let capturedCount = 0;
-          piecesGroup.children.forEach(other => {
-            if (other instanceof THREE.Mesh) {
-              const otherData = other.userData;
-              if (otherData.isCaptured) {
-                const otherIsRed = otherData.piece > 0;
-                if (otherIsRed === isRed) {
-                  capturedCount++;
-                }
-              }
-            }
-          });
-          
-          if (isRed) {
-            // 红方被吃的棋子放在棋盘左边
-            const leftBoundary = startX - CELL_SIZE * 1.5;
-            const offsetZ = capturedCount * CELL_SIZE * 0.75;
-            child.position.x = leftBoundary;
-            child.position.z = startZ + offsetZ;
-          } else {
-            // 黑方被吃的棋子放在棋盘右边
-            const rightBoundary = startX + (BOARD_WIDTH - 1) * CELL_SIZE + CELL_SIZE * 1.5;
-            const offsetZ = capturedCount * CELL_SIZE * 0.75;
-            child.position.x = rightBoundary;
-            child.position.z = startZ + offsetZ;
-          }
-          
-          child.position.y = 0;
+          targetMesh = child;
         }
       }
     });
+    
+    if (targetMesh) {
+      // 标记为死子
+      (targetMesh as THREE.Mesh).userData.isCaptured = true;
+      (targetMesh as THREE.Mesh).userData.row = -1;
+      (targetMesh as THREE.Mesh).userData.col = -1;
+      
+      // 移到棋盘边缘
+      const startX = -((BOARD_WIDTH - 1) * CELL_SIZE) / 2;
+      const startZ = -((BOARD_HEIGHT - 1) * CELL_SIZE) / 2;
+      const isRed = targetPiece > 0;
+      
+      // 统计该颜色已被吃的棋子数量
+      let capturedCount = 0;
+      piecesGroup.children.forEach(other => {
+        if (other instanceof THREE.Mesh) {
+          const otherData = other.userData;
+          if (otherData.isCaptured) {
+            const otherIsRed = otherData.piece > 0;
+            if (otherIsRed === isRed) {
+              capturedCount++;
+            }
+          }
+        }
+      });
+      
+      if (isRed) {
+        // 红方被吃的棋子放在棋盘左边
+        const leftBoundary = startX - CELL_SIZE * 1.5;
+        const offsetZ = capturedCount * CELL_SIZE * 0.75;
+        (targetMesh as THREE.Mesh).position.x = leftBoundary;
+        (targetMesh as THREE.Mesh).position.z = startZ + offsetZ;
+      } else {
+        // 黑方被吃的棋子放在棋盘右边
+        const rightBoundary = startX + (BOARD_WIDTH - 1) * CELL_SIZE + CELL_SIZE * 1.5;
+        const offsetZ = capturedCount * CELL_SIZE * 0.75;
+        (targetMesh as THREE.Mesh).position.x = rightBoundary;
+        (targetMesh as THREE.Mesh).position.z = startZ + offsetZ;
+      }
+      
+      (targetMesh as THREE.Mesh).position.y = 0;
+    }
   }
   
-  // 3. 更新所有棋子的位置和状态
-  updateAllPieces();
+  // 3. 更新拖动棋子的位置和状态
+  draggedPiece.userData.row = toRow;
+  draggedPiece.userData.col = toCol;
   
-  // 4. 更新棋盘数据
+  const startX = -((BOARD_WIDTH - 1) * CELL_SIZE) / 2;
+  const startZ = -((BOARD_HEIGHT - 1) * CELL_SIZE) / 2;
+  draggedPiece.position.x = startX + toCol * CELL_SIZE;
+  draggedPiece.position.z = startZ + toRow * CELL_SIZE;
+  draggedPiece.position.y = 0;
+  
+  // 4. 更新其他活子的位置（只更新那些位置发生变化的棋子）
+  updateOtherPieces(board);
+  
+  // 5. 更新棋盘数据
   chessStore.movePiece(fromRow, fromCol, toRow, toCol);
 }
 
 /**
- * 更新所有棋子的位置
+ * 更新其他活子的位置
  */
-function updateAllPieces() {
-  const board = chessStore.board;
+function updateOtherPieces(board: number[][]) {
   const selectedPiece = chessStore.selectedPiece;
   const startX = -((BOARD_WIDTH - 1) * CELL_SIZE) / 2;
   const startZ = -((BOARD_HEIGHT - 1) * CELL_SIZE) / 2;
@@ -776,53 +813,61 @@ function updateAllPieces() {
   // 遍历所有棋子
   piecesGroup.children.forEach(child => {
     if (child instanceof THREE.Mesh) {
-      const { piece, row, col, isCaptured } = child.userData;
+      const { row, col, isCaptured } = child.userData;
       
-      if (isCaptured) {
-        // 死子保持在边缘位置，不做处理
+      // 跳过死子和已经更新过的棋子
+      if (isCaptured || row < 0 || col < 0) {
         return;
       }
       
-      // 查找该棋子在棋盘上的新位置
-      let found = false;
-      for (let r = 0; r < BOARD_HEIGHT && !found; r++) {
-        for (let c = 0; c < BOARD_WIDTH && !found; c++) {
-          if (board[r][c] === piece) {
-            // 检查这个位置是否已经被其他活子占据
-            let isOccupied = false;
-            piecesGroup.children.forEach(other => {
-              if (other !== child && other instanceof THREE.Mesh) {
-                const otherData = other.userData;
-                if (!otherData.isCaptured && otherData.row === r && otherData.col === c) {
-                  isOccupied = true;
+      // 检查该棋子在棋盘上的当前位置是否还是正确的
+      const currentBoardPiece = board[row][col];
+      const meshPiece = child.userData.piece;
+      
+      // 如果棋盘上该位置的棋子与当前棋子不匹配，说明位置发生了变化
+      if (currentBoardPiece !== meshPiece) {
+        // 在棋盘上查找该棋子的新位置
+        for (let r = 0; r < BOARD_HEIGHT; r++) {
+          for (let c = 0; c < BOARD_WIDTH; c++) {
+            if (board[r][c] === meshPiece) {
+              // 检查这个位置是否已经被其他活子占据
+              let isOccupied = false;
+              piecesGroup.children.forEach(other => {
+                if (other !== child && other instanceof THREE.Mesh) {
+                  const otherData = other.userData;
+                  if (!otherData.isCaptured && otherData.row === r && otherData.col === c) {
+                    isOccupied = true;
+                  }
                 }
-              }
-            });
-            
-            if (!isOccupied) {
-              // 更新位置
-              child.position.x = startX + c * CELL_SIZE;
-              child.position.z = startZ + r * CELL_SIZE;
+              });
               
-              // 如果该棋子被选中，抬起一定距离
-              if (selectedPiece && selectedPiece[0] === r && selectedPiece[1] === c) {
-                child.position.y = 0.5;
-              } else {
-                child.position.y = 0;
+              if (!isOccupied) {
+                // 更新位置
+                child.position.x = startX + c * CELL_SIZE;
+                child.position.z = startZ + r * CELL_SIZE;
+                
+                // 如果该棋子被选中，抬起一定距离
+                if (selectedPiece && selectedPiece[0] === r && selectedPiece[1] === c) {
+                  child.position.y = 0.5;
+                } else {
+                  child.position.y = 0;
+                }
+                
+                // 更新 userData
+                child.userData.row = r;
+                child.userData.col = c;
+                return; // 找到后退出
               }
-              
-              // 更新 userData
-              child.userData.row = r;
-              child.userData.col = c;
-              found = true;
             }
           }
         }
-      }
-      
-      // 如果在棋盘上找不到该棋子，说明被吃了（这种情况不应该发生，因为已经在 executeMove 中处理了）
-      if (!found) {
-        console.warn('棋子在棋盘上找不到位置:', piece, row, col);
+      } else {
+        // 位置正确，只需更新选中状态
+        if (selectedPiece && selectedPiece[0] === row && selectedPiece[1] === col) {
+          child.position.y = 0.5;
+        } else {
+          child.position.y = 0;
+        }
       }
     }
   });
