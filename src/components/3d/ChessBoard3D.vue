@@ -11,6 +11,7 @@ import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js';
 import { useChessStore } from '../../store/chessStore';
 import { PIECES, type PieceType } from '../../logic/chess/constants';
+import { isValidMove } from '../../logic/chess/rules';
 
 const container = ref<HTMLDivElement | null>(null);
 const chessStore = useChessStore();
@@ -368,7 +369,7 @@ function drawPieceMarkers(startX: number, startZ: number) {
 }
 
 /**
- * 规则验证函数（目前假设所有移动都合法）
+ * 规则验证函数（调用 rules.ts 中的完整验证逻辑）
  * @param fromRow 起始行
  * @param fromCol 起始列
  * @param toRow 目标行
@@ -376,21 +377,7 @@ function drawPieceMarkers(startX: number, startZ: number) {
  * @returns 是否合法
  */
 function validateMove(fromRow: number, fromCol: number, toRow: number, toCol: number): boolean {
-  // TODO: 实现完整的规则验证
-  // 目前假设所有移动都合法
-  
-  // 基本检查：不能移动到同一个位置
-  if (fromRow === toRow && fromCol === toCol) {
-    return false;
-  }
-  
-  // 基本检查：目标位置必须在棋盘内
-  if (toRow < 0 || toRow >= BOARD_HEIGHT || toCol < 0 || toCol >= BOARD_WIDTH) {
-    return false;
-  }
-  
-  // 暂时返回 true，后续会实现具体规则
-  return true;
+  return isValidMove(chessStore.board, fromRow, fromCol, toRow, toCol);
 }
 
 /**
