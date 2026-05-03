@@ -806,8 +806,12 @@ function executeMove(fromRow: number, fromCol: number, toRow: number, toCol: num
   checkCheckAndCheckmate(toRow, toCol);
   
   // 6. 如果轮到黑方（AI），触发 AI 行棋
+  console.log('移动完成，当前玩家:', chessStore.currentPlayer);
   if (chessStore.currentPlayer === 'black') {
+    console.log('检测到轮到黑方，准备触发 AI...');
     triggerAIMove();
+  } else {
+    console.log('当前是红方，不触发 AI');
   }
 }
 
@@ -870,8 +874,13 @@ function hasAnyLegalMove(board: Board, color: 'red' | 'black'): boolean {
 async function triggerAIMove() {
   // 如果 AI 正在思考，不重复触发
   if (isAIThinking.value) {
+    console.log('AI 正在思考中，跳过本次触发');
     return;
   }
+  
+  console.log('=== 开始触发 AI 行棋 ===');
+  console.log('当前玩家:', chessStore.currentPlayer);
+  console.log('引擎已启动:', engineStarted);
   
   // 启动引擎（如果尚未启动）
   if (!engineStarted) {
@@ -891,22 +900,31 @@ async function triggerAIMove() {
   try {
     // 获取当前局面的 FEN
     const fen = chessStore.fen;
+    console.log('当前 FEN:', fen);
     
     // 请求 AI 最佳着法（搜索深度 15）
+    console.log('调用 getBestMove...');
     const bestMoveUCI = await getBestMove(fen, 15);
     
     console.log('AI 选择着法:', bestMoveUCI);
+    console.log('着法长度:', bestMoveUCI.length);
     
     // 转换 UCI 着法为内部坐标
+    console.log('开始转换坐标...');
     const [fromRow, fromCol, toRow, toCol] = UCIToMove(bestMoveUCI);
+    console.log(`转换后的坐标: (${fromRow},${fromCol}) → (${toRow},${toCol})`);
     
     // 执行 AI 移动
+    console.log('执行 AI 移动...');
     executeAIMove(fromRow, fromCol, toRow, toCol);
+    console.log('AI 移动完成');
     
   } catch (error) {
     console.error('AI 行棋失败:', error);
+    console.error('错误堆栈:', error instanceof Error ? error.stack : 'N/A');
   } finally {
     isAIThinking.value = false;
+    console.log('=== AI 行棋流程结束 ===');
   }
 }
 
