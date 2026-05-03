@@ -795,82 +795,8 @@ function executeMove(fromRow: number, fromCol: number, toRow: number, toCol: num
   draggedPiece.position.z = startZ + toRow * CELL_SIZE;
   draggedPiece.position.y = 0;
   
-  // 4. 更新其他活子的位置（只更新那些位置发生变化的棋子）
-  updateOtherPieces(board);
-  
-  // 5. 更新棋盘数据
+  // 4. 更新棋盘数据
   chessStore.movePiece(fromRow, fromCol, toRow, toCol);
-}
-
-/**
- * 更新其他活子的位置
- */
-function updateOtherPieces(board: number[][]) {
-  const selectedPiece = chessStore.selectedPiece;
-  const startX = -((BOARD_WIDTH - 1) * CELL_SIZE) / 2;
-  const startZ = -((BOARD_HEIGHT - 1) * CELL_SIZE) / 2;
-  
-  // 遍历所有棋子
-  piecesGroup.children.forEach(child => {
-    if (child instanceof THREE.Mesh) {
-      const { row, col, isCaptured } = child.userData;
-      
-      // 跳过死子和已经更新过的棋子
-      if (isCaptured || row < 0 || col < 0) {
-        return;
-      }
-      
-      // 检查该棋子在棋盘上的当前位置是否还是正确的
-      const currentBoardPiece = board[row][col];
-      const meshPiece = child.userData.piece;
-      
-      // 如果棋盘上该位置的棋子与当前棋子不匹配，说明位置发生了变化
-      if (currentBoardPiece !== meshPiece) {
-        // 在棋盘上查找该棋子的新位置
-        for (let r = 0; r < BOARD_HEIGHT; r++) {
-          for (let c = 0; c < BOARD_WIDTH; c++) {
-            if (board[r][c] === meshPiece) {
-              // 检查这个位置是否已经被其他活子占据
-              let isOccupied = false;
-              piecesGroup.children.forEach(other => {
-                if (other !== child && other instanceof THREE.Mesh) {
-                  const otherData = other.userData;
-                  if (!otherData.isCaptured && otherData.row === r && otherData.col === c) {
-                    isOccupied = true;
-                  }
-                }
-              });
-              
-              if (!isOccupied) {
-                // 更新位置
-                child.position.x = startX + c * CELL_SIZE;
-                child.position.z = startZ + r * CELL_SIZE;
-                
-                // 如果该棋子被选中，抬起一定距离
-                if (selectedPiece && selectedPiece[0] === r && selectedPiece[1] === c) {
-                  child.position.y = 0.5;
-                } else {
-                  child.position.y = 0;
-                }
-                
-                // 更新 userData
-                child.userData.row = r;
-                child.userData.col = c;
-                return; // 找到后退出
-              }
-            }
-          }
-        }
-      } else {
-        // 位置正确，只需更新选中状态
-        if (selectedPiece && selectedPiece[0] === row && selectedPiece[1] === col) {
-          child.position.y = 0.5;
-        } else {
-          child.position.y = 0;
-        }
-      }
-    }
-  });
 }
 
 /**
