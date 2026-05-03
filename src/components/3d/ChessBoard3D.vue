@@ -1,5 +1,10 @@
 <template>
-  <div ref="container" class="chess-board-3d"></div>
+  <div ref="container" class="chess-board-3d">
+    <!-- 将军/绝杀提示图片 -->
+    <div v-if="showCheckAlert" class="check-alert">
+      <img :src="alertImage" alt="提示" class="alert-image" />
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -10,11 +15,18 @@ import { Line2 } from 'three/examples/jsm/lines/Line2.js';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js';
 import { useChessStore } from '../../store/chessStore';
-import { PIECES, type PieceType } from '../../logic/chess/constants';
-import { isValidMove } from '../../logic/chess/rules';
+import { PIECES, type PieceType, type Board } from '../../logic/chess/constants';
+import { isValidMove, isInCheck } from '../../logic/chess/rules';
+import checkImage from '../../assets/将军.png';
+import checkmateImage from '../../assets/绝杀.png';
 
 const container = ref<HTMLDivElement | null>(null);
 const chessStore = useChessStore();
+
+// 将军/绝杀提示相关状态
+const showCheckAlert = ref(false);
+const alertImage = ref('');
+let alertTimer: number | null = null;
 
 // Three.js 相关变量
 let scene: THREE.Scene;
@@ -784,6 +796,100 @@ function executeMove(fromRow: number, fromCol: number, toRow: number, toCol: num
   
   // 4. 更新棋盘数据
   chessStore.movePiece(fromRow, fromCol, toRow, toCol);
+  
+  // 5. 检查是否形成将军或绝杀
+  checkCheckAndCheckmate(toRow, toCol);
+}
+
+/**
+ * 检查并显示将军/绝杀提示
+ */
+function checkCheckAndCheckmate(movedToRow: number, movedToCol: number) {
+  const board = chessStore.board;
+  const nextPlayer = chessStore.currentPlayer; // 移动后切换到对方
+  
+  // 检查对方是否被将军
+  const isOpponentInCheck = isInCheck(board, nextPlayer);
+  
+  if (isOpponentInCheck) {
+    // 检查对方是否有解将的着法（即是否绝杀）
+    const hasEscape = hasAnyLegalMove(board, nextPlayer);
+    
+    if (!hasEscape) {
+      // 绝杀
+      displayCheckmateAlert();
+    } else {
+      // 将军
+      displayCheckAlert();
+    }
+  }
+}
+
+/**
+ * 检查指定颜色是否有任何合法的移动
+ */
+function hasAnyLegalMove(board: Board, color: 'red' | 'black'): boolean {
+  for (let fromRow = 0; fromRow < 10; fromRow++) {
+    for (let fromCol = 0; fromCol < 9; fromCol++) {
+      const piece = board[fromRow][fromCol];
+      
+      // 跳过空位和对方的棋子
+      if (piece === PIECES.EMPTY) continue;
+      const pieceColor = piece > 0 ? 'red' : 'black';
+      if (pieceColor !== color) continue;
+      
+      // 尝试所有可能的目标位置
+      for (let toRow = 0; toRow < 10; toRow++) {
+        for (let toCol = 0; toCol < 9; toCol++) {
+          if (fromRow === toRow && fromCol === toCol) continue;
+          
+          // 验证这个移动是否合法
+          if (isValidMove(board, fromRow, fromCol, toRow, toCol)) {
+            return true; // 找到一个合法移动
+          }
+        }
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * 显示将军提示
+ */
+function displayCheckAlert() {
+  // 清除之前的定时器
+  if (alertTimer !== null) {
+    clearTimeout(alertTimer);
+  }
+  
+  alertImage.value = checkImage;
+  showCheckAlert.value = true;
+  
+  // 3秒后隐藏
+  alertTimer = window.setTimeout(() => {
+    showCheckAlert.value = false;
+    alertTimer = null;
+  }, 3000);
+}
+
+/**
+ * 显示绝杀提示
+ */
+function displayCheckmateAlert() {
+  // 清除之前的定时器
+  if (alertTimer !== null) {
+    clearTimeout(alertTimer);
+  }
+  
+  alertImage.value = checkmateImage;
+  showCheckAlert.value = true;
+  
+  // 3秒后隐藏
+  alertTimer = window.setTimeout(() => {
+    showCheckAlert.value = false;
+    alertTimer = null;
+  }, 3000);
 }
 
 /**
@@ -858,6 +964,12 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener('resize', onWindowResize);
   
+  // 清理提示定时器
+  if (alertTimer !== null) {
+    clearTimeout(alertTimer);
+    alertTimer = null;
+  }
+  
   // 清理鼠标事件监听
   if (renderer && renderer.domElement) {
     renderer.domElement.removeEventListener('mousedown', onMouseDown);
@@ -884,4 +996,29 @@ onBeforeUnmount(() => {
   height: 100%;
   position: relative;
 }
+
+.check-alert {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1000;
+  animation: pulse 0.5s ease-in-out infinite alternate;
+}
+
+.alert-image {
+  width: 200px;
+  height: auto;
+  filter: drop-shadow(0 0 20px rgba(255, 0, 0, 0.8));
+}
+
+@keyframes pulse {
+  from {
+    transform: translate(-50%, -50%) scale(1);
+  }
+  to {
+    transform: translate(-50%, -50%) scale(1.1);
+  }
+}
+
 </style>
