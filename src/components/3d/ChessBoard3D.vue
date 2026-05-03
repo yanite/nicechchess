@@ -452,21 +452,36 @@ function updatePieces() {
   const startX = -((BOARD_WIDTH - 1) * CELL_SIZE) / 2;
   const startZ = -((BOARD_HEIGHT - 1) * CELL_SIZE) / 2;
 
+  // 记录每个棋子类型在棋盘上的出现次数，用于处理同类型棋子
+  const pieceCountOnBoard: Record<number, number> = {};
+  
+  // 统计棋盘上每种棋子的数量
+  for (let row = 0; row < BOARD_HEIGHT; row++) {
+    for (let col = 0; col < BOARD_WIDTH; col++) {
+      const piece = board[row][col];
+      if (piece !== PIECES.EMPTY) {
+        pieceCountOnBoard[piece] = (pieceCountOnBoard[piece] || 0) + 1;
+      }
+    }
+  }
+
   // 遍历所有现有棋子，更新它们的位置和状态
   piecesGroup.children.forEach(child => {
     if (child instanceof THREE.Mesh) {
-      const { row: oldRow, col: oldCol, piece } = child.userData;
+      const { piece } = child.userData;
       
       // 查找该棋子当前在棋盘上的位置
       let newRow = -1;
       let newCol = -1;
       let found = false;
       
+      // 如果是正在拖动的棋子，使用 userData 中的旧位置作为参考
+      // 但实际上应该从棋盘数据中查找它的新位置
+      
       for (let row = 0; row < BOARD_HEIGHT && !found; row++) {
         for (let col = 0; col < BOARD_WIDTH && !found; col++) {
           if (board[row][col] === piece) {
             // 检查这个位置是否已经被其他同类型棋子占据
-            // 通过检查是否有其他棋子的 userData 指向这个位置
             let isOccupied = false;
             piecesGroup.children.forEach(other => {
               if (other !== child && other instanceof THREE.Mesh) {
@@ -502,10 +517,20 @@ function updatePieces() {
         child.userData.row = newRow;
         child.userData.col = newCol;
       } else {
-        // 棋子被吃掉，移到棋盘外
-        child.position.x = 100; // 移到很远的地方
-        child.position.z = 100;
-        child.position.y = -100;
+        // 棋子被吃掉，移到棋盘左边一个棋子外的位置
+        // 计算棋盘左边界
+        const leftBoundary = startX - CELL_SIZE * 1.5; // 左边再偏移1.5个棋子距离
+        // 根据棋子类型分配不同的垂直位置，避免重叠
+        const pieceIndex = Object.keys(pieceCountOnBoard).indexOf(String(piece));
+        const offsetZ = (pieceIndex % 5) * CELL_SIZE * 1.5; // 每5个棋子一排
+        
+        child.position.x = leftBoundary;
+        child.position.z = startZ + offsetZ;
+        child.position.y = 0; // 放在棋盘平面上
+        
+        // 更新 userData 标记为已移除
+        child.userData.row = -1;
+        child.userData.col = -1;
       }
     }
   });
@@ -748,30 +773,8 @@ function onMouseUp(event: MouseEvent) {
  * 执行移动
  */
 function executeMove(fromRow: number, fromCol: number, toRow: number, toCol: number) {
-  const board = chessStore.board;
-  const targetPiece = board[toRow][toCol];
-  
-  // 如果目标位置有棋子，将其移到边界外
-  if (targetPiece !== PIECES.EMPTY) {
-    // 找到目标位置的棋子网格
-    piecesGroup.children.forEach(child => {
-      if (child instanceof THREE.Mesh) {
-        const { row, col } = child.userData;
-        // 排除正在拖动的棋子本身
-        if (row === toRow && col === toCol && child !== draggedPiece) {
-          // 移到边界外
-          child.position.x = 100;
-          child.position.z = 100;
-          child.position.y = -100;
-        }
-      }
-    });
-  }
-  
-  // 更新棋盘数据
+  // 更新棋盘数据（updatePieces 会通过 watch 自动调用，更新所有棋子位置）
   chessStore.movePiece(fromRow, fromCol, toRow, toCol);
-  
-  // updatePieces 会通过 watch 自动调用，更新所有棋子位置
 }
 
 /**
