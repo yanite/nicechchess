@@ -253,7 +253,7 @@ function drawBoardLines() {
  */
 function drawPieceMarkers(startX: number, startZ: number) {
   const markerMaterial = new THREE.LineBasicMaterial({ color: 0x000000 });
-  const markerSize = 0.12; // 位标拐线长度（减小以避免超出边界）
+  const markerSize = 0.15; // 位标拐线长度
 
   // 定义需要绘制位标的位置（col, row）
   const markerPositions = [
@@ -271,45 +271,53 @@ function drawPieceMarkers(startX: number, startZ: number) {
     const x = startX + col * CELL_SIZE;
     const z = startZ + row * CELL_SIZE;
 
-    // 左上角拐线
-    const leftTopPoints = [
-      new THREE.Vector3(x - markerSize, 0.01, z - markerSize / 2),
-      new THREE.Vector3(x - markerSize / 2, 0.01, z - markerSize / 2),
-      new THREE.Vector3(x - markerSize / 2, 0.01, z - markerSize),
-    ];
-    const leftTopGeometry = new THREE.BufferGeometry().setFromPoints(leftTopPoints);
-    const leftTopLine = new THREE.Line(leftTopGeometry, markerMaterial);
-    boardGroup.add(leftTopLine);
+    // 左上角拐线（排除最左边的列 col=0）
+    if (col > 0) {
+      const leftTopPoints = [
+        new THREE.Vector3(x - markerSize, 0.01, z - markerSize / 2),
+        new THREE.Vector3(x - markerSize / 2, 0.01, z - markerSize / 2),
+        new THREE.Vector3(x - markerSize / 2, 0.01, z - markerSize),
+      ];
+      const leftTopGeometry = new THREE.BufferGeometry().setFromPoints(leftTopPoints);
+      const leftTopLine = new THREE.Line(leftTopGeometry, markerMaterial);
+      boardGroup.add(leftTopLine);
+    }
 
-    // 右上角拐线
-    const rightTopPoints = [
-      new THREE.Vector3(x + markerSize / 2, 0.01, z - markerSize),
-      new THREE.Vector3(x + markerSize / 2, 0.01, z - markerSize / 2),
-      new THREE.Vector3(x + markerSize, 0.01, z - markerSize / 2),
-    ];
-    const rightTopGeometry = new THREE.BufferGeometry().setFromPoints(rightTopPoints);
-    const rightTopLine = new THREE.Line(rightTopGeometry, markerMaterial);
-    boardGroup.add(rightTopLine);
+    // 右上角拐线（排除最右边的列 col=8）
+    if (col < BOARD_WIDTH - 1) {
+      const rightTopPoints = [
+        new THREE.Vector3(x + markerSize / 2, 0.01, z - markerSize),
+        new THREE.Vector3(x + markerSize / 2, 0.01, z - markerSize / 2),
+        new THREE.Vector3(x + markerSize, 0.01, z - markerSize / 2),
+      ];
+      const rightTopGeometry = new THREE.BufferGeometry().setFromPoints(rightTopPoints);
+      const rightTopLine = new THREE.Line(rightTopGeometry, markerMaterial);
+      boardGroup.add(rightTopLine);
+    }
 
-    // 左下角拐线
-    const leftBottomPoints = [
-      new THREE.Vector3(x - markerSize, 0.01, z + markerSize / 2),
-      new THREE.Vector3(x - markerSize / 2, 0.01, z + markerSize / 2),
-      new THREE.Vector3(x - markerSize / 2, 0.01, z + markerSize),
-    ];
-    const leftBottomGeometry = new THREE.BufferGeometry().setFromPoints(leftBottomPoints);
-    const leftBottomLine = new THREE.Line(leftBottomGeometry, markerMaterial);
-    boardGroup.add(leftBottomLine);
+    // 左下角拐线（排除最左边的列 col=0）
+    if (col > 0) {
+      const leftBottomPoints = [
+        new THREE.Vector3(x - markerSize, 0.01, z + markerSize / 2),
+        new THREE.Vector3(x - markerSize / 2, 0.01, z + markerSize / 2),
+        new THREE.Vector3(x - markerSize / 2, 0.01, z + markerSize),
+      ];
+      const leftBottomGeometry = new THREE.BufferGeometry().setFromPoints(leftBottomPoints);
+      const leftBottomLine = new THREE.Line(leftBottomGeometry, markerMaterial);
+      boardGroup.add(leftBottomLine);
+    }
 
-    // 右下角拐线
-    const rightBottomPoints = [
-      new THREE.Vector3(x + markerSize / 2, 0.01, z + markerSize),
-      new THREE.Vector3(x + markerSize / 2, 0.01, z + markerSize / 2),
-      new THREE.Vector3(x + markerSize, 0.01, z + markerSize / 2),
-    ];
-    const rightBottomGeometry = new THREE.BufferGeometry().setFromPoints(rightBottomPoints);
-    const rightBottomLine = new THREE.Line(rightBottomGeometry, markerMaterial);
-    boardGroup.add(rightBottomLine);
+    // 右下角拐线（排除最右边的列 col=8）
+    if (col < BOARD_WIDTH - 1) {
+      const rightBottomPoints = [
+        new THREE.Vector3(x + markerSize / 2, 0.01, z + markerSize),
+        new THREE.Vector3(x + markerSize / 2, 0.01, z + markerSize / 2),
+        new THREE.Vector3(x + markerSize, 0.01, z + markerSize / 2),
+      ];
+      const rightBottomGeometry = new THREE.BufferGeometry().setFromPoints(rightBottomPoints);
+      const rightBottomLine = new THREE.Line(rightBottomGeometry, markerMaterial);
+      boardGroup.add(rightBottomLine);
+    }
   });
 }
 
