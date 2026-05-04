@@ -90,9 +90,9 @@ async function initScene() {
     boardTexturePath = config.ui.board_texture;
     currentPieceShape = config.ui.piece_shape || 'cylinder'; // 加载棋子形状
     opponentTextDirection = config.ui.opponent_text_direction || 'down'; // 加载对方棋子字体方向
-    console.log('加载棋盘纹理配置:', boardTexturePath);
-    console.log('加载棋子形状配置:', currentPieceShape);
-    console.log('加载对方棋子字体方向配置:', opponentTextDirection);
+    // console.log('加载棋盘纹理配置:', boardTexturePath);
+    // console.log('加载棋子形状配置:', currentPieceShape);
+    // console.log('加载对方棋子字体方向配置:', opponentTextDirection);
   } catch (error) {
     console.warn('加载配置失败，使用默认纹理:', error);
   }

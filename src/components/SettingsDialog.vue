@@ -238,11 +238,8 @@ const settings = ref<Settings>({
 });
 
 const selectedTexture = ref<string>('tx1');
-const availableTextures = ref<Array<{ value: string; label: string }>>([
-  { value: 'tx1', label: '纹理1 (tx1)' },
-  { value: 'tx2', label: '纹理2 (tx2)' },
-  { value: 'custom', label: '自定义纹理...' },
-]);
+// 可用纹理列表（初始为空，等待扫描）
+const availableTextures = ref<Array<{ value: string; label: string }>>([]);
 
 // 加载配置
 async function loadSettings() {
@@ -496,6 +493,8 @@ function close() {
 // 组件挂载时加载配置
 onMounted(() => {
   loadSettings();
+  // 扫描可用纹理目录
+  scanAvailableTextures();
 });
 </script>
 
