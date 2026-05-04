@@ -98,9 +98,8 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { loadConfig, saveConfig } from '../services/configService';
+import { loadConfig, saveConfig, scanTextureDirectories } from '../services/configService';
 import { open } from '@tauri-apps/plugin-dialog';
-import { invoke } from '@tauri-apps/api/core';
 
 interface Settings {
   engine: {
@@ -167,7 +166,7 @@ async function loadSettings() {
 // 扫描可用的纹理目录
 async function scanAvailableTextures() {
   try {
-    const textures: string[] = await invoke('scan_texture_directories');
+    const textures = await scanTextureDirectories();
     
     availableTextures.value = textures.map(t => ({
       value: t,
