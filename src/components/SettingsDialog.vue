@@ -87,6 +87,85 @@
             </label>
           </div>
         </div>
+
+        <!-- 5. AI线程数 -->
+        <div class="setting-item">
+          <label>AI线程数：</label>
+          <input 
+            type="number" 
+            v-model.number="settings.engine.threads"
+            min="1"
+            max="64"
+            @change="validateAndSaveThreads"
+          />
+          <span class="hint">建议值：CPU核心数的一半</span>
+        </div>
+
+        <!-- 6. AI哈希表大小 -->
+        <div class="setting-item">
+          <label>AI哈希表大小 (MB)：</label>
+          <input 
+            type="number" 
+            v-model.number="settings.engine.hash"
+            min="16"
+            max="32768"
+            step="256"
+            @change="validateAndSaveHash"
+          />
+          <span class="hint">范围：16-32768 MB，默认 2048</span>
+        </div>
+
+        <!-- 7. AI计算模式 -->
+        <div class="setting-item">
+          <label>AI计算模式：</label>
+          <div class="radio-group">
+            <label>
+              <input 
+                type="radio" 
+                value="depth" 
+                v-model="settings.engine.calculation_mode"
+                @change="saveSettings"
+              />
+              按深度计算
+            </label>
+            <label>
+              <input 
+                type="radio" 
+                value="time" 
+                v-model="settings.engine.calculation_mode"
+                @change="saveSettings"
+              />
+              按时间计算
+            </label>
+          </div>
+        </div>
+
+        <!-- 8. 搜索深度 -->
+        <div v-if="settings.engine.calculation_mode === 'depth'" class="setting-item">
+          <label>搜索深度：</label>
+          <input 
+            type="number" 
+            v-model.number="settings.engine.depth"
+            min="1"
+            max="100"
+            @change="validateAndSaveDepth"
+          />
+          <span class="hint">范围：1-100，默认 20</span>
+        </div>
+
+        <!-- 9. 思考时间 -->
+        <div v-if="settings.engine.calculation_mode === 'time'" class="setting-item">
+          <label>每步思考时间 (毫秒)：</label>
+          <input 
+            type="number" 
+            v-model.number="settings.engine.movetime"
+            min="100"
+            max="3000"
+            step="100"
+            @change="validateAndSaveMovetime"
+          />
+          <span class="hint">范围：100-3000 ms，默认 1000</span>
+        </div>
       </div>
       
       <div class="dialog-footer">
@@ -103,6 +182,11 @@ import { loadConfig, saveConfig, scanTextureDirectories } from '../services/conf
 interface Settings {
   engine: {
     pikafish_path: string;
+    threads: number;        // CPU线程数
+    hash: number;           // 哈希表大小(MB)
+    calculation_mode: 'time' | 'depth';  // 计算模式：时间或深度
+    movetime: number;       // 每步思考时间(毫秒)
+    depth: number;          // 搜索深度
   };
   ui: {
     board_texture: string;
@@ -123,6 +207,11 @@ const emit = defineEmits<{
 const settings = ref<Settings>({
   engine: {
     pikafish_path: 'public/pikafish/pikafish-vnni512.exe',
+    threads: Math.max(1, Math.floor(navigator.hardwareConcurrency || 4) / 2),  // CPU核心数的一半
+    hash: 2048,
+    calculation_mode: 'depth',
+    movetime: 1000,
+    depth: 20,
   },
   ui: {
     board_texture: 'src/assets/textures/tx1/dark_wood_diff_1k.jpg',
@@ -143,6 +232,12 @@ async function loadSettings() {
   try {
     const config = await loadConfig();
     settings.value.engine.pikafish_path = config.engine.pikafish_path;
+    settings.value.engine.threads = (config.engine as any).threads ?? 2;
+    settings.value.engine.hash = (config.engine as any).hash ?? 64;
+    settings.value.engine.calculation_mode = (config.engine as any).calculation_mode || 'time';
+    settings.value.engine.movetime = (config.engine as any).movetime ?? 1000;
+    settings.value.engine.depth = (config.engine as any).depth ?? 10;
+    
     settings.value.ui.board_texture = config.ui.board_texture || 'src/assets/textures/tx1/dark_wood_diff_1k.jpg';
     settings.value.ui.opponent_text_direction = (config.ui as any).opponent_text_direction || 'down';
     settings.value.ui.piece_shape = (config.ui as any).piece_shape || 'cylinder';
@@ -195,6 +290,46 @@ async function saveSettings() {
   } catch (error) {
     console.error('保存配置失败:', error);
   }
+}
+
+// 验证并保存线程数
+function validateAndSaveThreads() {
+  if (settings.value.engine.threads < 1) {
+    settings.value.engine.threads = 1;
+  } else if (settings.value.engine.threads > 64) {
+    settings.value.engine.threads = 64;
+  }
+  saveSettings();
+}
+
+// 验证并保存哈希表大小
+function validateAndSaveHash() {
+  if (settings.value.engine.hash < 16) {
+    settings.value.engine.hash = 16;
+  } else if (settings.value.engine.hash > 32768) {
+    settings.value.engine.hash = 32768;
+  }
+  saveSettings();
+}
+
+// 验证并保存搜索深度
+function validateAndSaveDepth() {
+  if (settings.value.engine.depth < 1) {
+    settings.value.engine.depth = 1;
+  } else if (settings.value.engine.depth > 100) {
+    settings.value.engine.depth = 100;
+  }
+  saveSettings();
+}
+
+// 验证并保存思考时间
+function validateAndSaveMovetime() {
+  if (settings.value.engine.movetime < 100) {
+    settings.value.engine.movetime = 100;
+  } else if (settings.value.engine.movetime > 3000) {
+    settings.value.engine.movetime = 3000;
+  }
+  saveSettings();
 }
 
 // 选择引擎路径

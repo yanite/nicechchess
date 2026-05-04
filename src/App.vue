@@ -228,6 +228,17 @@ onMounted(async () => {
     console.error('注册窗口监听器失败:', error);
   }
   
+  // 监听页面刷新/关闭事件，停止引擎
+  window.addEventListener('beforeunload', async () => {
+    console.log('页面即将刷新或关闭，停止AI引擎...');
+    try {
+      const { stopEngine } = await import('./services/engineService');
+      await stopEngine();
+    } catch (error) {
+      console.error('停止引擎失败:', error);
+    }
+  });
+  
   // 在组件卸载时清理事件监听器
   onUnmounted(() => {
     if (unlistenMove) {
@@ -322,7 +333,15 @@ function openSettings() {
 // 处理设置变更
 function onSettingsChanged(settings: any) {
   console.log('设置已更改:', settings);
-  // TODO: 通知ChessBoard3D组件更新配置
+  
+  // 更新引擎配置到 store
+  chessStore.setEngineConfig({
+    threads: settings.engine.threads,
+    hash: settings.engine.hash,
+    calculationMode: settings.engine.calculation_mode,
+    movetime: settings.engine.movetime,
+    depth: settings.engine.depth
+  });
 }
 
 // 打开新游戏对话框
@@ -347,9 +366,6 @@ function handleNewGame(config: NewGameConfig) {
       // ChessBoard3D组件会自动检测并触发AI
     }, 1000);
   }
-  
-  // 显示提示
-  alert(`新游戏开始！\n黑方：${config.blackPlayer.name}${config.blackPlayer.useAI ? ' (AI Lv.' + config.blackPlayer.aiLevel + ')' : ''}\n红方：${config.redPlayer.name}${config.redPlayer.useAI ? ' (AI Lv.' + config.redPlayer.aiLevel + ')' : ''}\n每步用时：${config.timePerMove}秒`);
 }
 
 </script>

@@ -30,6 +30,15 @@ export interface PlayerConfig {
   aiLevel: number;
 }
 
+// AI 引擎配置接口
+export interface EngineConfig {
+  threads: number;
+  hash: number;
+  calculationMode: 'time' | 'depth';
+  movetime: number;
+  depth: number;
+}
+
 // 棋局状态接口
 export interface GameState {
   board: Board;
@@ -43,6 +52,7 @@ export interface GameState {
   blackTime: number;  // 黑方剩余时间（秒）
   blackPlayer: PlayerConfig;  // 黑方玩家配置
   redPlayer: PlayerConfig;    // 红方玩家配置
+  engineConfig: EngineConfig;  // AI引擎配置
 }
 
 export const useChessStore = defineStore('chess', () => {
@@ -67,6 +77,15 @@ export const useChessStore = defineStore('chess', () => {
     name: 'Play2',
     useAI: false,
     aiLevel: 15
+  });
+  
+  // AI引擎配置（默认值）
+  const engineConfig = ref<EngineConfig>({
+    threads: Math.max(1, Math.floor((typeof navigator !== 'undefined' && navigator.hardwareConcurrency) || 4) / 2),
+    hash: 2048,
+    calculationMode: 'depth',
+    movetime: 1000,
+    depth: 20
   });
 
   // 计算属性：获取 FEN 串
@@ -217,6 +236,14 @@ export const useChessStore = defineStore('chess', () => {
   }
 
   /**
+   * 设置引擎配置
+   */
+  function setEngineConfig(config: EngineConfig) {
+    engineConfig.value = { ...config };
+    console.log('引擎配置已更新:', config);
+  }
+
+  /**
    * 获取当前玩家的 AI 等级
    */
   function getCurrentPlayerAILevel(): number | undefined {
@@ -344,6 +371,7 @@ export const useChessStore = defineStore('chess', () => {
     blackTime,
     blackPlayer,
     redPlayer,
+    engineConfig,
     
     // 计算属性
     fen,
@@ -359,6 +387,7 @@ export const useChessStore = defineStore('chess', () => {
     generateFEN,
     loadFromFEN,
     setPlayers,
+    setEngineConfig,
     getCurrentPlayerAILevel,
     isCurrentPlayerAI,
   };
