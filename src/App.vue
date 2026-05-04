@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import ChessBoard3D from './components/3d/ChessBoard3D.vue';
+import SettingsDialog from './components/SettingsDialog.vue';
 import { useChessStore } from './store/chessStore';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
 const chessStore = useChessStore();
+const showSettings = ref(false);
 
 // 计算当前行棋方显示文本
 const currentPlayerText = computed(() => {
@@ -46,6 +48,17 @@ function resetGame() {
 function undoMove() {
   chessStore.undoMove();
 }
+
+// 打开设置对话框
+function openSettings() {
+  showSettings.value = true;
+}
+
+// 处理设置变更
+function onSettingsChanged(settings: any) {
+  console.log('设置已更改:', settings);
+  // TODO: 通知ChessBoard3D组件更新配置
+}
 </script>
 
 <template>
@@ -55,12 +68,20 @@ function undoMove() {
       <div class="menu-items">
         <button @click="resetGame">新游戏</button>
         <button @click="undoMove" :disabled="!chessStore.canUndo">悔棋</button>
+        <button @click="openSettings">选项</button>
         <span class="game-info">
           当前: {{ currentPlayerText }} | 
           FEN: {{ chessStore.fen.substring(0, 30) }}...
         </span>
       </div>
     </header>
+
+    <!-- 设置对话框 -->
+    <SettingsDialog 
+      :visible="showSettings" 
+      @update:visible="showSettings = $event"
+      @settings-changed="onSettingsChanged"
+    />
 
     <!-- 主内容区 -->
     <main class="main-content">

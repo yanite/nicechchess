@@ -38,6 +38,22 @@ pub struct EngineConfig {
 pub struct UIConfig {
     /// 棋盘纹理路径
     pub board_texture: String,
+    /// 对方棋子字体方向：down(向下) / up(向上)
+    #[serde(default = "default_opponent_text_direction")]
+    pub opponent_text_direction: String,
+    /// 棋子形状：cylinder(圆柱形) / standard(标准型)
+    #[serde(default = "default_piece_shape")]
+    pub piece_shape: String,
+}
+
+/// 默认的对方棋子字体方向
+fn default_opponent_text_direction() -> String {
+    "down".to_string()
+}
+
+/// 默认的棋子形状
+fn default_piece_shape() -> String {
+    "cylinder".to_string()
 }
 
 impl AppConfig {
@@ -102,6 +118,8 @@ impl AppConfig {
             },
             ui: UIConfig {
                 board_texture: "src/assets/textures/tx1/dark_wood_diff_1k.jpg".to_string(),
+                opponent_text_direction: "down".to_string(),
+                piece_shape: "cylinder".to_string(),
             },
         }
     }
