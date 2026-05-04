@@ -4,6 +4,11 @@
     <div v-if="showCheckAlert" class="check-alert">
       <img :src="alertImage" alt="提示" class="alert-image" />
     </div>
+    
+    <!-- AI行棋提示 -->
+    <div v-if="showAIHint" class="ai-hint">
+      <div class="hint-text">AI 正在行棋中，请勿操作</div>
+    </div>
   </div>
 </template>
 
@@ -29,6 +34,10 @@ const chessStore = useChessStore();
 const showCheckAlert = ref(false);
 const alertImage = ref('');
 let alertTimer: number | null = null;
+
+// AI 思考提示相关状态
+const showAIHint = ref(false);
+let aiHintTimer: number | null = null;
 
 // AI 引擎相关状态
 const isAIThinking = ref(false); // AI 是否正在思考
@@ -905,6 +914,16 @@ function onMouseDown(event: MouseEvent) {
     return; // 让OrbitControls处理相机操作
   }
 
+  // 检查是否双方都是AI，如果是则提示用户
+  const blackIsAI = chessStore.blackPlayer.useAI;
+  const redIsAI = chessStore.redPlayer.useAI;
+  
+  if (blackIsAI && redIsAI) {
+    console.log('双方都是AI，禁止手动操作');
+    showAIThinkingHint();
+    return;
+  }
+
   // 计算鼠标位置
   const rect = renderer.domElement.getBoundingClientRect();
   mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
@@ -1449,6 +1468,24 @@ function displayCheckmateAlert() {
 }
 
 /**
+ * 显示AI行棋提示
+ */
+function showAIThinkingHint() {
+  // 清除之前的定时器
+  if (aiHintTimer !== null) {
+    clearTimeout(aiHintTimer);
+  }
+  
+  showAIHint.value = true;
+  
+  // 2秒后隐藏
+  aiHintTimer = window.setTimeout(() => {
+    showAIHint.value = false;
+    aiHintTimer = null;
+  }, 2000);
+}
+
+/**
  * 重置棋子位置到原位
  */
 function resetPiecePosition(pieceMesh: THREE.Mesh) {
@@ -1716,6 +1753,12 @@ onBeforeUnmount(() => {
     alertTimer = null;
   }
   
+  // 清理AI提示定时器
+  if (aiHintTimer !== null) {
+    clearTimeout(aiHintTimer);
+    aiHintTimer = null;
+  }
+  
   // 清理鼠标事件监听
   if (renderer && renderer.domElement) {
     renderer.domElement.removeEventListener('mousedown', onMouseDown);
@@ -1757,6 +1800,21 @@ onBeforeUnmount(() => {
   width: 200px;
   height: auto;
   filter: drop-shadow(0 0 20px rgba(255, 0, 0, 0.8));
+}
+
+.ai-hint {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1000;
+  background-color: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 10px 20px;
+  border-radius: 5px;
+  font-size: 16px;
+  font-weight: bold;
+  pointer-events: none; /* 让点击事件穿透提示层 */
 }
 
 @keyframes pulse {
