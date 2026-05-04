@@ -493,21 +493,21 @@ function createPieces() {
         pieceMesh.position.z = startZ + row * CELL_SIZE;
         // 注意：不要设置 y 坐标，createPieceMesh 已经根据棋子形状正确设置了y坐标
         
-        // 设置文字朝向：红方始终向右，黑方根据配置决定方向
+        // 设置文字朝向：控制文字顶部方向
         const isRed = piece > 0;
         let rotationY = 0;
         
         if (isRed) {
-          // 红方：字体向右（顺时针90度），头部朝向楚河汉界（棋盘中心）
-          rotationY = Math.PI / 2;
+          // 红方：文字顶部朝上（朝向棋盘上方/楚河汉界），不旋转
+          rotationY = 0;
         } else {
-          // 黑方：根据配置决定方向
+          // 黑方：根据配置决定文字顶部方向
           if (opponentTextDirection === 'down') {
-            // 向下：字体向左（逆时针90度），头部朝向楚河汉界（棋盘中心）
-            rotationY = -Math.PI / 2;
+            // 向下：文字顶部朝下（朝向棋盘下方/楚河汉界），旋转180度
+            rotationY = Math.PI;
           } else {
-            // 向上：字体向右（顺时针90度），尾部朝向楚河汉界
-            rotationY = Math.PI / 2;
+            // 向上：文字顶部朝上（远离楚河汉界），不旋转
+            rotationY = 0;
           }
         }
         
@@ -818,21 +818,21 @@ function syncPiecesWithBoard() {
         pieceMesh.position.z = startZ + row * CELL_SIZE;
         // 注意：不要设置 y 坐标，createPieceMesh 已经根据棋子形状正确设置了y坐标
         
-        // 设置文字朝向
+        // 设置文字朝向：控制文字顶部方向
         const isRed = piece > 0;
         let rotationY = 0;
         
         if (isRed) {
-          // 红方：字体向右（顺时针90度），头部朝向楚河汉界（棋盘中心）
-          rotationY = Math.PI / 2;
+          // 红方：文字顶部朝上（朝向棋盘上方/楚河汉界），不旋转
+          rotationY = 0;
         } else {
-          // 黑方：根据配置决定方向
+          // 黑方：根据配置决定文字顶部方向
           if (opponentTextDirection === 'down') {
-            // 向下：字体向左（逆时针90度），头部朝向楚河汉界（棋盘中心）
-            rotationY = -Math.PI / 2;
+            // 向下：文字顶部朝下（朝向棋盘下方/楚河汉界），旋转180度
+            rotationY = Math.PI;
           } else {
-            // 向上：字体向右（顺时针90度），尾部朝向楚河汉界
-            rotationY = Math.PI / 2;
+            // 向上：文字顶部朝上（远离楚河汉界），不旋转
+            rotationY = 0;
           }
         }
         
