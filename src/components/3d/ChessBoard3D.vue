@@ -93,17 +93,17 @@ async function initScene() {
   renderer.shadowMap.enabled = true;
   container.value.appendChild(renderer.domElement);
 
-  // 添加轨道控制器 - 默认禁用，需要按住 Ctrl 才能旋转
+  // 添加轨道控制器 - 始终启用，通过修饰键控制不同操作
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.05;
-  controls.enabled = false; // 默认禁用旋转
+  controls.enabled = true; // 始终启用
   
-  // 配置鼠标按钮：左键用于拖动棋子，右键用于旋转视角
+  // 配置鼠标按钮：默认禁用所有操作，由键盘修饰键动态控制
   controls.mouseButtons = {
-    LEFT: null,        // 左键不用于旋转（留给棋子拖动）
-    MIDDLE: THREE.MOUSE.DOLLY,  // 中键缩放
-    RIGHT: THREE.MOUSE.ROTATE   // 右键旋转
+    LEFT: null,        // 左键默认不执行任何操作
+    MIDDLE: null,      // 中键禁用
+    RIGHT: null        // 右键禁用
   };
 
   // 添加灯光
@@ -646,10 +646,15 @@ function getPieceChineseName(piece: PieceType): string {
 }
 
 /**
- * 鼠标按下事件 - 开始拖动棋子或启用旋转
+ * 鼠标按下事件 - 开始拖动棋子或相机控制
  */
 function onMouseDown(event: MouseEvent) {
   if (!container.value) return;
+
+  // 如果按下了修饰键（Alt/Ctrl/Shift），不处理棋子移动，交给OrbitControls处理
+  if (event.altKey || event.ctrlKey || event.shiftKey) {
+    return; // 让OrbitControls处理相机操作
+  }
 
   // 计算鼠标位置
   const rect = renderer.domElement.getBoundingClientRect();
@@ -659,8 +664,8 @@ function onMouseDown(event: MouseEvent) {
   // 射线检测
   raycaster.setFromCamera(mouse, camera);
   
-  // 首先检测是否点击到棋子（只响应左键）
-  if (event.button === 0) {  // 左键
+  // 只响应左键
+  if (event.button === 0) {
     const pieceIntersects = raycaster.intersectObjects(piecesGroup.children);
 
     if (pieceIntersects.length > 0) {
@@ -691,21 +696,10 @@ function onMouseDown(event: MouseEvent) {
         // 抬起棋子
         selectedObject.position.y = 0.8;
         
-        // 禁用旋转控制器，避免冲突
+        // 临时禁用控制器，避免冲突
         controls.enabled = false;
         return;
       }
-    }
-    
-    // 如果左键没有点击到棋子，检测是否点击到棋盘
-    const boardIntersects = raycaster.intersectObjects(boardGroup.children);
-    
-    if (boardIntersects.length > 0) {
-      // 点击到棋盘，禁用旋转
-      controls.enabled = false;
-    } else {
-      // 点击到棋盘外面，启用旋转摄像头
-      controls.enabled = true;
     }
   }
 }
@@ -785,6 +779,11 @@ function onMouseUp(event: MouseEvent) {
   // 重置拖动状态
   isDragging = false;
   draggedPiece = null;
+  
+  // 恢复控制器状态（根据当前修饰键状态）
+  if (controls) {
+    controls.enabled = true;
+  }
 }
 
 /**
@@ -1263,23 +1262,45 @@ onMounted(() => {
     console.error('启动 AI 引擎失败:', error);
   });
   
-  // 添加键盘事件监听，按住 Ctrl 键时启用摄像头旋转
-  const handleKeyDown = (event: KeyboardEvent) => {
-    if (event.ctrlKey && controls) {
-      // 检查是否是 Ctrl+H 组合键（重置相机视角）
-      if (event.key.toLowerCase() === 'h') {
-        event.preventDefault(); // 阻止默认行为
-        resetCameraView();
-        return;
-      }
+  // 添加键盘事件监听，根据修饰键动态控制相机操作
+  const updateControlsMode = (keyboardEvent: KeyboardEvent) => {
+    if (!controls) return;
+    
+    // 根据修饰键设置不同的鼠标操作模式
+    if (keyboardEvent.altKey) {
+      // Alt + 左键：旋转
+      controls.mouseButtons.LEFT = THREE.MOUSE.ROTATE;
       controls.enabled = true;
+    } else if (keyboardEvent.ctrlKey) {
+      // Ctrl + 左键：缩放
+      controls.mouseButtons.LEFT = THREE.MOUSE.DOLLY;
+      controls.enabled = true;
+    } else if (keyboardEvent.shiftKey) {
+      // Shift + 左键：平移
+      controls.mouseButtons.LEFT = THREE.MOUSE.PAN;
+      controls.enabled = true;
+    } else {
+      // 无修饰键：禁用相机控制，允许拖动棋子
+      controls.mouseButtons.LEFT = null;
+      controls.enabled = false;
     }
   };
   
-  const handleKeyUp = (event: KeyboardEvent) => {
-    if (!event.ctrlKey && controls) {
-      controls.enabled = false;
+  const handleKeyDown = (event: KeyboardEvent) => {
+    // 检查是否是 Ctrl+H 组合键（重置相机视角）
+    if (event.ctrlKey && event.key.toLowerCase() === 'h') {
+      event.preventDefault(); // 阻止默认行为
+      resetCameraView();
+      return;
     }
+    
+    // 更新控制器模式
+    updateControlsMode(event);
+  };
+  
+  const handleKeyUp = (event: KeyboardEvent) => {
+    // 更新控制器模式
+    updateControlsMode(event);
   };
   
   window.addEventListener('keydown', handleKeyDown);
