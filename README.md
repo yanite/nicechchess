@@ -2,6 +2,11 @@
 
 这是一个基于 Tauri + Vue 3 + Three.js 构建的 3D 中国象棋游戏，支持人机对战（AI 使用 Pikafish 引擎）。
 
+## pikafish 选项
+
+https://www.pikafish.com/wiki/index.php?title=UCI%E9%80%89%E9%A1%B9
+
+
 ## 🎮 功能特性
 
 - ✅ 完整的 3D 棋盘渲染和交互
