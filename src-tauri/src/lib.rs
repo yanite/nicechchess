@@ -65,6 +65,57 @@ fn scan_texture_directories() -> Result<Vec<String>, String> {
     Ok(textures)
 }
 
+/// 获取指定纹理目录下的所有贴图文件
+#[tauri::command]
+fn get_texture_files(texture_name: String) -> Result<Vec<String>, String> {
+    use std::fs;
+    use std::env;
+    
+    // 尝试多个可能的路径
+    let possible_paths = vec![
+        PathBuf::from(format!("src/assets/textures/{}", texture_name)),
+        PathBuf::from(format!("../src/assets/textures/{}", texture_name)),
+        env::current_dir().unwrap_or_default().join(format!("src/assets/textures/{}", texture_name)),
+    ];
+    
+    let mut texture_path = None;
+    
+    for path in possible_paths {
+        if path.exists() && path.is_dir() {
+            texture_path = Some(path);
+            break;
+        }
+    }
+    
+    if texture_path.is_none() {
+        return Err(format!("未找到纹理目录: {}", texture_name));
+    }
+    
+    let texture_path = texture_path.unwrap();
+    println!("扫描纹理目录: {:?}", texture_path);
+    
+    let mut files = vec![];
+    
+    for entry in fs::read_dir(&texture_path).map_err(|e| format!("读取目录失败: {}", e))? {
+        let entry = entry.map_err(|e| format!("读取条目失败: {}", e))?;
+        let path = entry.path();
+        
+        if path.is_file() {
+            if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
+                // 只返回图片文件
+                if file_name.ends_with(".jpg") || file_name.ends_with(".jpeg") || 
+                   file_name.ends_with(".png") || file_name.ends_with(".exr") {
+                    files.push(file_name.to_string());
+                }
+            }
+        }
+    }
+    
+    files.sort();
+    println!("找到的贴图文件: {:?}", files);
+    Ok(files)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -79,7 +130,8 @@ pub fn run() {
             stop_engine,
             get_best_move,
             update_engine_config,
-            scan_texture_directories
+            scan_texture_directories,
+            get_texture_files
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
