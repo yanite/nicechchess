@@ -493,7 +493,7 @@ function createPieces() {
         pieceMesh.position.z = startZ + row * CELL_SIZE;
         // 注意：不要设置 y 坐标，createPieceMesh 已经根据棋子形状正确设置了y坐标
         
-        // 设置棋子文字朝向：根据配置的对方棋子字体方向和棋子颜色决定
+        // 设置文字朝向：根据配置的对方棋子字体方向和棋子颜色决定
         const isRed = piece > 0;
         let rotationY = 0;
         
@@ -809,10 +809,10 @@ function syncPiecesWithBoard() {
       if (piece !== PIECES.EMPTY) {
         const pieceMesh = createPieceMesh(piece, row, col);
         
-        // 设置位置
+        // 设置位置（x和z坐标）
         pieceMesh.position.x = startX + col * CELL_SIZE;
         pieceMesh.position.z = startZ + row * CELL_SIZE;
-        pieceMesh.position.y = 0;
+        // 注意：不要设置 y 坐标，createPieceMesh 已经根据棋子形状正确设置了y坐标
         
         // 设置文字朝向
         const isRed = piece > 0;
@@ -1344,7 +1344,7 @@ function executeAIMove(fromRow: number, fromCol: number, toRow: number, toCol: n
         (targetMesh as THREE.Mesh).position.z = startZ + offsetZ;
       }
       
-      (targetMesh as THREE.Mesh).position.y = 0;
+      // 不要设置y坐标，保持棋子原有的高度
     }
   }
   
