@@ -531,6 +531,64 @@ function createPieces() {
 }
 
 /**
+ * 创建木纹纹理
+ */
+function createWoodTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  const size = 256;
+  canvas.width = size;
+  canvas.height = size;
+  
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('无法获取 canvas 上下文');
+  
+  // 基础木色背景
+  ctx.fillStyle = '#D2B48C'; // 棕褐色
+  ctx.fillRect(0, 0, size, size);
+  
+  // 绘制木纹线条
+  ctx.strokeStyle = 'rgba(139, 69, 19, 0.3)'; // 深棕色半透明
+  ctx.lineWidth = 2;
+  
+  for (let i = 0; i < size; i += 8) {
+    ctx.beginPath();
+    ctx.moveTo(0, i);
+    
+    // 添加波浪效果模拟木纹
+    for (let x = 0; x < size; x += 20) {
+      const yOffset = Math.sin(x * 0.05) * 3;
+      ctx.lineTo(x, i + yOffset);
+    }
+    
+    ctx.stroke();
+  }
+  
+  // 添加一些深色纹理线
+  ctx.strokeStyle = 'rgba(101, 67, 33, 0.2)';
+  ctx.lineWidth = 1;
+  
+  for (let i = 0; i < size; i += 15) {
+    ctx.beginPath();
+    ctx.moveTo(0, i);
+    
+    for (let x = 0; x < size; x += 15) {
+      const yOffset = Math.cos(x * 0.08) * 2;
+      ctx.lineTo(x, i + yOffset);
+    }
+    
+    ctx.stroke();
+  }
+  
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(2, 1); // 水平重复2次
+  texture.needsUpdate = true;
+  
+  return texture;
+}
+
+/**
  * 创建单个棋子网格（带文字）- 使用鼓型设计
  */
 function createPieceMesh(piece: PieceType, _row: number, _col: number): THREE.Mesh {
@@ -568,15 +626,19 @@ function createPieceMesh(piece: PieceType, _row: number, _col: number): THREE.Me
   // 创建带文字的纹理
   const texture = createPieceTexture(piece, isRed);
   
-  // 侧面材质（木质质感）- LatheGeometry 主要显示这个材质
+  // 创建木纹纹理用于侧面
+  const woodTexture = createWoodTexture();
+  
+  // 侧面材质（木纹质感）
   const sideMaterial = new THREE.MeshStandardMaterial({
-    color: isRed ? 0xFF6B6B : 0x4a4a4a,
-    roughness: 0.5,
-    metalness: 0.15,
+    map: woodTexture,
+    color: 0xffffff,        // 白色基底，让木纹自然显示
+    roughness: 0.6,         // 木质粗糙度
+    metalness: 0.0,         // 无金属感
   });
   
   const mesh = new THREE.Mesh(geometry, sideMaterial);
-  mesh.position.y = 0; // 居中放置
+  mesh.position.y = height / 2; // 向上偏移半个厚度，避免镶嵌到棋盘
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   
