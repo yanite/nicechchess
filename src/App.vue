@@ -2,10 +2,85 @@
 import ChessBoard3D from './components/3d/ChessBoard3D.vue';
 import SettingsDialog from './components/SettingsDialog.vue';
 import { useChessStore } from './store/chessStore';
-import { computed, ref } from 'vue';
+import { computed, ref, onMounted } from 'vue';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 
 const chessStore = useChessStore();
 const showSettings = ref(false);
+
+// 窗口状态管理
+const WINDOW_STATE_KEY = 'chchess_window_state';
+
+interface WindowState {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+// 保存窗口状态到localStorage（带防抖）
+let saveTimeout: number | null = null;
+function saveWindowStateDebounced() {
+  if (saveTimeout) {
+    clearTimeout(saveTimeout);
+  }
+  
+  saveTimeout = window.setTimeout(async () => {
+    try {
+      const appWindow = getCurrentWindow();
+      const position = await appWindow.outerPosition();
+      const size = await appWindow.outerSize();
+      
+      const state: WindowState = {
+        x: position.x,
+        y: position.y,
+        width: size.width,
+        height: size.height,
+      };
+      
+      localStorage.setItem(WINDOW_STATE_KEY, JSON.stringify(state));
+      console.log('窗口状态已保存:', state);
+    } catch (error) {
+      console.error('保存窗口状态失败:', error);
+    }
+  }, 500); // 500ms 防抖
+}
+
+// 恢复窗口状态
+async function restoreWindowState() {
+  try {
+    const saved = localStorage.getItem(WINDOW_STATE_KEY);
+    if (!saved) return;
+    
+    const state: WindowState = JSON.parse(saved);
+    const appWindow = getCurrentWindow();
+    
+    // 设置窗口位置和大小
+    await appWindow.setPosition({ x: state.x, y: state.y });
+    await appWindow.setSize({ width: state.width, height: state.height });
+    
+    console.log('窗口状态已恢复:', state);
+  } catch (error) {
+    console.error('恢复窗口状态失败:', error);
+  }
+}
+
+// 组件挂载时恢复窗口状态并监听事件
+onMounted(async () => {
+  // 恢复窗口状态
+  await restoreWindowState();
+  
+  // 监听窗口移动和调整大小事件
+  const appWindow = getCurrentWindow();
+  
+  appWindow.onMoved(() => {
+    saveWindowStateDebounced();
+  });
+  
+  appWindow.onResized(() => {
+    saveWindowStateDebounced();
+  });
+});
 
 // 计算当前行棋方显示文本
 const currentPlayerText = computed(() => {
