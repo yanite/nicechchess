@@ -1641,6 +1641,22 @@ const handleStorageChange = (e: StorageEvent) => {
 
 window.addEventListener('storage', handleStorageChange);
 
+// 监听currentPlayer变化，自动触发AI行棋
+watch(
+  () => chessStore.currentPlayer,
+  (newPlayer, oldPlayer) => {
+    console.log(`当前玩家变化: ${oldPlayer} -> ${newPlayer}`);
+    
+    // 如果新玩家是AI，延迟触发AI行棋
+    if (chessStore.isCurrentPlayerAI()) {
+      console.log(`检测到${newPlayer === 'red' ? '红方' : '黑方'}使用AI，准备触发...`);
+      setTimeout(() => {
+        triggerAIMove();
+      }, 1000);
+    }
+  }
+);
+
 // 监听currentMoveIndex变化（用于悔棋/重做后更新UI）
 watch(
   () => chessStore.currentMoveIndex,

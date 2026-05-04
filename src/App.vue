@@ -356,14 +356,15 @@ function handleNewGame(config: NewGameConfig) {
   // 设置玩家配置
   chessStore.setPlayers(config.blackPlayer, config.redPlayer);
   
-  // 重置棋盘状态
+  // 重置棋盘状态（红方先手）
   chessStore.resetGame();
   
-  // 如果黑方是AI，延迟触发AI行棋
-  if (config.blackPlayer.useAI) {
-    console.log('黑方使用AI，等级:', config.blackPlayer.aiLevel);
+  // 如果红方是AI，延迟触发AI行棋（红方先手）
+  if (config.redPlayer.useAI) {
+    console.log('红方使用AI，等级:', config.redPlayer.aiLevel);
     setTimeout(() => {
       // ChessBoard3D组件会自动检测并触发AI
+      console.log('触发红方AI行棋');
     }, 1000);
   }
 }
