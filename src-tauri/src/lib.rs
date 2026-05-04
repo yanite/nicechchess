@@ -21,12 +21,31 @@ fn update_engine_config(pikafish_path: String) -> Result<(), String> {
 #[tauri::command]
 fn scan_texture_directories() -> Result<Vec<String>, String> {
     use std::fs;
+    use std::env;
     
-    let textures_path = PathBuf::from("src/assets/textures");
+    // 尝试多个可能的路径
+    let possible_paths = vec![
+        PathBuf::from("src/assets/textures"),           // 开发模式
+        PathBuf::from("../src/assets/textures"),        // 从 target 目录向上
+        env::current_dir().unwrap_or_default().join("src/assets/textures"), // 当前工作目录
+    ];
     
-    if !textures_path.exists() {
-        return Ok(vec![]);
+    let mut textures_path = None;
+    
+    for path in possible_paths {
+        if path.exists() && path.is_dir() {
+            textures_path = Some(path);
+            break;
+        }
     }
+    
+    if textures_path.is_none() {
+        eprintln!("未找到纹理目录，返回默认值");
+        return Ok(vec!["tx1".to_string(), "tx2".to_string()]);
+    }
+    
+    let textures_path = textures_path.unwrap();
+    println!("找到纹理目录: {:?}", textures_path);
     
     let mut textures = vec![];
     
@@ -42,6 +61,7 @@ fn scan_texture_directories() -> Result<Vec<String>, String> {
     }
     
     textures.sort();
+    println!("扫描到的纹理: {:?}", textures);
     Ok(textures)
 }
 
