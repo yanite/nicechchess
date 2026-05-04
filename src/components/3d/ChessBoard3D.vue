@@ -772,35 +772,48 @@ function generateStablePieceId(piece: PieceType, row: number, col: number): stri
 
 /**
  * 同步3D棋子位置与store的棋盘状态
- * 策略：清空现有棋子组，根据当前board状态重新创建所有棋子
+ * 策略：保留被吃掉的棋子，只更新棋盘上的棋子位置
  */
 function syncPiecesWithBoard() {
   if (!piecesGroup || !scene) return;
   
   console.log('开始同步3D棋子');
   
-  // 第一步：移除所有现有棋子
-  while(piecesGroup.children.length > 0) {
-    const child = piecesGroup.children[0];
-    piecesGroup.remove(child);
-    
-    // 释放资源
-    if (child instanceof THREE.Mesh) {
-      child.geometry.dispose();
-      if (Array.isArray(child.material)) {
-        child.material.forEach(mat => mat.dispose());
-      } else {
-        child.material.dispose();
-      }
-    }
-  }
-  
-  // 第二步：根据当前board状态重新创建所有棋子
   const board = chessStore.board;
   const startX = -((BOARD_WIDTH - 1) * CELL_SIZE) / 2;
   const startZ = -((BOARD_HEIGHT - 1) * CELL_SIZE) / 2;
   
-  // 记录每种棋子的计数，用于生成唯一编号
+  // 第一步：收集所有被吃掉的棋子（isCaptured = true）
+  const capturedPieces: THREE.Mesh[] = [];
+  const piecesToRemove: THREE.Object3D[] = [];
+  
+  piecesGroup.children.forEach(child => {
+    if (child instanceof THREE.Mesh) {
+      const userData = child.userData as any;
+      if (userData.isCaptured) {
+        // 保留被吃掉的棋子
+        capturedPieces.push(child);
+      } else {
+        // 标记棋盘上的棋子待移除
+        piecesToRemove.push(child);
+      }
+    }
+  });
+  
+  // 第二步：移除所有棋盘上的棋子（保留被吃掉的棋子）
+  piecesToRemove.forEach(piece => {
+    piecesGroup.remove(piece);
+    if (piece instanceof THREE.Mesh) {
+      piece.geometry.dispose();
+      if (Array.isArray(piece.material)) {
+        piece.material.forEach(mat => mat.dispose());
+      } else {
+        piece.material.dispose();
+      }
+    }
+  });
+  
+  // 第三步：根据当前board状态重新创建棋盘上的棋子
   const pieceCounter: Record<string, number> = {};
   
   for (let row = 0; row < BOARD_HEIGHT; row++) {
@@ -849,7 +862,7 @@ function syncPiecesWithBoard() {
           owner: isRed ? '红' : '黑',
           pieceName: pieceName,
           uniqueId: uniqueId,
-          isCaptured: false
+          isCaptured: false  // 棋盘上的棋子都是活子
         };
         
         piecesGroup.add(pieceMesh);
@@ -857,7 +870,12 @@ function syncPiecesWithBoard() {
     }
   }
   
-  console.log(`3D棋子同步完成，共创建 ${piecesGroup.children.length} 个棋子`);
+  // 第四步：将被吃掉的棋子重新添加回场景
+  capturedPieces.forEach(capturedPiece => {
+    piecesGroup.add(capturedPiece);
+  });
+  
+  console.log(`3D棋子同步完成，共 ${piecesGroup.children.length} 个棋子（其中 ${capturedPieces.length} 个被吃掉）`);
 }
 
 /**
@@ -1109,7 +1127,10 @@ function executeMove(fromRow: number, fromCol: number, toRow: number, toCol: num
         (targetMesh as THREE.Mesh).position.z = startZ + offsetZ;
       }
       
-      // 不要设置y坐标，保持棋子原有的高度
+      // 被吃掉的棋子也需要保持正确的高度
+      // 由于我们不再手动设置y坐标，棋子会保持createPieceMesh中设置的原始高度
+      // 但为了确保可见，可以稍微降低一点高度让它看起来是"倒下"的状态
+      (targetMesh as THREE.Mesh).position.y = 0.01; // 保持在棋盘平面上
     }
   }
   
@@ -1344,7 +1365,10 @@ function executeAIMove(fromRow: number, fromCol: number, toRow: number, toCol: n
         (targetMesh as THREE.Mesh).position.z = startZ + offsetZ;
       }
       
-      // 不要设置y坐标，保持棋子原有的高度
+      // 被吃掉的棋子也需要保持正确的高度
+      // 由于我们不再手动设置y坐标，棋子会保持createPieceMesh中设置的原始高度
+      // 但为了确保可见，可以稍微降低一点高度让它看起来是"倒下"的状态
+      (targetMesh as THREE.Mesh).position.y = 0.01; // 保持在棋盘平面上
     }
   }
   
