@@ -18,6 +18,101 @@ interface WindowState {
   height: number;
 }
 
+// 窗口尺寸和位置约束
+const MIN_WINDOW_SIZE = 400; // 最小窗口尺寸
+const DEFAULT_WINDOW_WIDTH = 1280;
+const DEFAULT_WINDOW_HEIGHT = 720;
+const DEFAULT_WINDOW_X = 100;
+const DEFAULT_WINDOW_Y = 100;
+
+/**
+ * 验证并修正窗口状态，确保不会出现非法值
+ */
+async function validateAndFixWindowState(state: WindowState): Promise<WindowState> {
+  const appWindow = getCurrentWindow();
+  
+  // 获取屏幕尺寸
+  let screenWidth = window.screen.width;
+  let screenHeight = window.screen.height;
+  
+  // 尝试获取更准确的屏幕工作区（排除任务栏）
+  try {
+    const currentMonitor = await appWindow.currentMonitor();
+    if (currentMonitor) {
+      screenWidth = currentMonitor.size.width;
+      screenHeight = currentMonitor.size.height;
+      console.log('检测到屏幕尺寸:', { width: screenWidth, height: screenHeight });
+    }
+  } catch (error) {
+    console.warn('无法获取屏幕信息，使用默认值:', error);
+  }
+  
+  let fixedState = { ...state };
+  let needsFix = false;
+  
+  // 验证窗口大小
+  if (fixedState.width < MIN_WINDOW_SIZE) {
+    console.warn(`窗口宽度过小 (${fixedState.width})，修正为 ${DEFAULT_WINDOW_WIDTH}`);
+    fixedState.width = DEFAULT_WINDOW_WIDTH;
+    needsFix = true;
+  }
+  
+  if (fixedState.height < MIN_WINDOW_SIZE) {
+    console.warn(`窗口高度过小 (${fixedState.height})，修正为 ${DEFAULT_WINDOW_HEIGHT}`);
+    fixedState.height = DEFAULT_WINDOW_HEIGHT;
+    needsFix = true;
+  }
+  
+  // 限制窗口最大尺寸为屏幕尺寸
+  if (fixedState.width > screenWidth) {
+    console.warn(`窗口宽度超出屏幕 (${fixedState.width} > ${screenWidth})，修正为 ${screenWidth - 50}`);
+    fixedState.width = screenWidth - 50;
+    needsFix = true;
+  }
+  
+  if (fixedState.height > screenHeight) {
+    console.warn(`窗口高度超出屏幕 (${fixedState.height} > ${screenHeight})，修正为 ${screenHeight - 50}`);
+    fixedState.height = screenHeight - 50;
+    needsFix = true;
+  }
+  
+  // 验证窗口位置
+  if (fixedState.x < 0 || fixedState.x >= screenWidth) {
+    console.warn(`窗口X坐标非法 (${fixedState.x})，修正为 ${DEFAULT_WINDOW_X}`);
+    fixedState.x = DEFAULT_WINDOW_X;
+    needsFix = true;
+  }
+  
+  if (fixedState.y < 0 || fixedState.y >= screenHeight) {
+    console.warn(`窗口Y坐标非法 (${fixedState.y})，修正为 ${DEFAULT_WINDOW_Y}`);
+    fixedState.y = DEFAULT_WINDOW_Y;
+    needsFix = true;
+  }
+  
+  // 确保窗口不会完全超出屏幕右侧或底部
+  if (fixedState.x + fixedState.width > screenWidth) {
+    const newX = Math.max(0, screenWidth - fixedState.width - 10);
+    console.warn(`窗口会超出屏幕右侧，X坐标从 ${fixedState.x} 修正为 ${newX}`);
+    fixedState.x = newX;
+    needsFix = true;
+  }
+  
+  if (fixedState.y + fixedState.height > screenHeight) {
+    const newY = Math.max(0, screenHeight - fixedState.height - 10);
+    console.warn(`窗口会超出屏幕底部，Y坐标从 ${fixedState.y} 修正为 ${newY}`);
+    fixedState.y = newY;
+    needsFix = true;
+  }
+  
+  if (needsFix) {
+    console.log('窗口状态已修正:', fixedState);
+  } else {
+    console.log('窗口状态验证通过');
+  }
+  
+  return fixedState;
+}
+
 // 保存窗口状态到localStorage（带防抖）
 let saveTimeout: number | null = null;
 function saveWindowStateDebounced() {
@@ -51,12 +146,15 @@ async function restoreWindowState() {
   try {
     const saved = localStorage.getItem(WINDOW_STATE_KEY);
     if (!saved) {
-      console.log('未找到保存的窗口状态');
+      console.log('未找到保存的窗口状态，使用默认值');
       return;
     }
     
-    const state: WindowState = JSON.parse(saved);
+    let state: WindowState = JSON.parse(saved);
     console.log('读取到保存的窗口状态:', state);
+    
+    // 验证并修正窗口状态
+    state = await validateAndFixWindowState(state);
     
     const appWindow = getCurrentWindow();
     
