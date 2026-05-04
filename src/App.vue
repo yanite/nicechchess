@@ -67,19 +67,38 @@ async function restoreWindowState() {
 
 // 组件挂载时恢复窗口状态并监听事件
 onMounted(async () => {
+  console.log('App.vue onMounted - 开始初始化窗口监听');
+  
   // 恢复窗口状态
   await restoreWindowState();
   
   // 监听窗口移动和调整大小事件
   const appWindow = getCurrentWindow();
+  console.log('获取到appWindow对象:', appWindow);
   
-  appWindow.onMoved(() => {
-    saveWindowStateDebounced();
-  });
-  
-  appWindow.onResized(() => {
-    saveWindowStateDebounced();
-  });
+  try {
+    const unlistenMove = await appWindow.onMoved((event) => {
+      console.log('窗口移动事件触发:', event.payload);
+      saveWindowStateDebounced();
+    });
+    console.log('窗口移动监听器已注册');
+    
+    const unlistenResize = await appWindow.onResized((event) => {
+      console.log('窗口调整大小事件触发:', event.payload);
+      saveWindowStateDebounced();
+    });
+    console.log('窗口调整大小监听器已注册');
+    
+    // 在组件卸载时清理事件监听器
+    import { onUnmounted } from 'vue';
+    onUnmounted(() => {
+      unlistenMove();
+      unlistenResize();
+      console.log('窗口监听器已清理');
+    });
+  } catch (error) {
+    console.error('注册窗口监听器失败:', error);
+  }
 });
 
 // 计算当前行棋方显示文本
