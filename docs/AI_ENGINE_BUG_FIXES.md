@@ -16,6 +16,7 @@
 | 6 | FEN 行序完全颠倒 | 🔴 致命 | ✅ 已修复 |
 | 7 | FEN 行棋方标识符错误 | 🟡 中等 | ✅ 已修复 |
 | 8 | AI 着法缺少规则验证 | 🟡 中等 | ✅ 已修复 |
+| 9 | 窗口移动导致频繁重新编译 | 🔴 严重 | ✅ 已修复 |
 
 ---
 
@@ -119,7 +120,7 @@ println!("当前工作目录: {:?}", std::env::current_dir());
 - Pikafish 期望国际象棋标准缩写：`N` (Knight), `B` (Bishop)
 
 **修复方案：**
-```typescript
+``typescript
 // 修复前（错误）
 [PIECES.R_HORSE]: 'H',      // ❌ Horse
 [PIECES.R_ELEPHANT]: 'E',   // ❌ Elephant
@@ -146,7 +147,7 @@ println!("当前工作目录: {:?}", std::env::current_dir());
 - 需要反转行号才能正确映射
 
 **修复方案：**
-```typescript
+``typescript
 export function boardToUCI(row: number, col: number): string {
   const files = 'abcdefghi';
   const uciRow = 9 - row;  // ✅ 反转行号
@@ -182,7 +183,7 @@ export function UCIToBoard(uci: string): [number, number] {
 > "你把棋盘底朝天递给 AI 了，AI 只能趴在红方老家里动黑棋。"
 
 **修复方案：**
-```typescript
+``typescript
 // 修复前（错误）
 for (let row = 9; row >= 0; row--) {  // ❌ 从红方到黑方
   // ...
@@ -218,7 +219,7 @@ rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR b - - 0 1
 
 **修复方案：**
 经过测试，Pikafish 接受国际象棋标准的 `w/b`，因此保持使用：
-```typescript
+``typescript
 fen += ` ${currentPlayer.value === 'red' ? 'w' : 'b'}`;
 ```
 
@@ -244,7 +245,7 @@ fen += ` ${currentPlayer.value === 'red' ? 'w' : 'b'}`;
 
 **修复方案：**
 在 `executeAIMove` 函数开头添加规则验证：
-```typescript
+``typescript
 // 验证 AI 着法是否符合规则
 const board = chessStore.board;
 if (!isValidMove(board, fromRow, fromCol, toRow, toCol)) {
@@ -255,6 +256,69 @@ console.log('AI 着法验证通过');
 ```
 
 **相关提交：** `f4dd97a`
+
+---
+
+### **Bug #9: 窗口移动导致频繁重新编译**
+
+**发现时间：** 2026-05-04  
+**影响范围：** `src-tauri/src/config.rs`, `src-tauri/src/lib.rs`  
+**现象描述：**
+```
+配置已保存: "config.yaml"
+配置加载成功: "config.yaml"
+配置已保存: "config.yaml"
+配置加载成功: "config.yaml"
+...
+Info File src-tauri\config.yaml changed. Rebuilding application...
+Running DevCommand (`cargo run --no-default-features --color always --`)
+```
+每次移动窗口都会触发配置文件保存，Tauri检测到文件变化后重新编译应用，导致不断重启。
+
+**根本原因：**
+1. 配置文件保存在项目目录中（`config.yaml`）
+2. Tauri开发模式会监听项目文件变化
+3. 窗口移动/调整大小时频繁保存配置（每500ms）
+4. 文件变化触发Tauri自动重新编译
+
+**修复方案：**
+
+1. **修改配置存储位置到系统配置目录**：
+```rust
+// 修复前（错误）❌
+fn get_config_path() -> PathBuf {
+    PathBuf::from("config.yaml")  // 项目目录
+}
+
+// 修复后（正确）✅
+fn get_config_path() -> PathBuf {
+    let config_dir = dirs::config_dir()
+        .expect("无法获取系统配置目录")
+        .join("chchess");
+    
+    if !config_dir.exists() {
+        fs::create_dir_all(&config_dir).expect("创建配置目录失败");
+    }
+    
+    config_dir.join("config.yaml")  // 系统配置目录
+}
+```
+
+2. **增加防抖时间**：
+``rust
+// 修复前：500ms
+std::thread::sleep(std::time::Duration::from_millis(500));
+
+// 修复后：2000ms
+std::thread::sleep(std::time::Duration::from_millis(2000));
+```
+
+**验证方法：**
+1. 启动应用并移动窗口
+2. 观察控制台日志，不应再出现频繁的"配置已保存"和"Rebuilding application"
+3. 检查系统配置目录（Windows: `%APPDATA%\chchess\config.yaml`）是否有配置文件
+
+**相关提交：** `1c59b91`
 
 ---
 
