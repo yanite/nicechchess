@@ -6,6 +6,7 @@ use engine::{EngineState, start_engine, stop_engine, get_best_move};
 use config::AppConfig;
 use tauri::Manager;
 use std::sync::{Arc, Mutex};
+use std::path::PathBuf;
 use tauri::State;
 
 #[tauri::command]
@@ -93,6 +94,8 @@ pub fn run() {
                 },
                 ui: config::UIConfig {
                     board_texture: "src/assets/textures/tx1/dark_wood_diff_1k.jpg".to_string(),
+                    opponent_text_direction: "down".to_string(),
+                    piece_shape: "cylinder".to_string(),
                 },
             });
             
