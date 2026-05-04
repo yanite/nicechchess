@@ -1,5 +1,5 @@
 <template>
-  <div ref="container" class="chess-board-3d" @click="hideCheckAlert">
+  <div ref="container" class="chess-board-3d">
     <!-- 将军/绝杀提示图片 -->
     <div v-if="showCheckAlert" class="check-alert">
       <img :src="alertImage" alt="提示" class="alert-image" />
@@ -493,18 +493,22 @@ function createPieces() {
         pieceMesh.position.z = startZ + row * CELL_SIZE;
         // 注意：不要设置 y 坐标，createPieceMesh 已经根据棋子形状正确设置了y坐标
         
-        // 设置文字朝向：根据配置的对方棋子字体方向和棋子颜色决定
+        // 设置文字朝向：红方始终向右，黑方根据配置决定方向
         const isRed = piece > 0;
         let rotationY = 0;
         
-        if (opponentTextDirection === 'down') {
-          // 对方棋子字体方向：向下
-          // 红方字体旋转90度，黑方字体旋转-90度
-          rotationY = isRed ? Math.PI / 2 : -Math.PI / 2;
-        } else {
-          // 对方棋子字体方向：向上
-          // 红方字体旋转90度，黑方字体也旋转90度
+        if (isRed) {
+          // 红方：字体向右（顺时针90度），头部朝向楚河汉界（棋盘中心）
           rotationY = Math.PI / 2;
+        } else {
+          // 黑方：根据配置决定方向
+          if (opponentTextDirection === 'down') {
+            // 向下：字体向左（逆时针90度），头部朝向楚河汉界（棋盘中心）
+            rotationY = -Math.PI / 2;
+          } else {
+            // 向上：字体向右（顺时针90度），尾部朝向楚河汉界
+            rotationY = Math.PI / 2;
+          }
         }
         
         pieceMesh.rotation.y = rotationY;
@@ -772,48 +776,35 @@ function generateStablePieceId(piece: PieceType, row: number, col: number): stri
 
 /**
  * 同步3D棋子位置与store的棋盘状态
- * 策略：保留被吃掉的棋子，只更新棋盘上的棋子位置
+ * 策略：清空现有棋子组，根据当前board状态重新创建所有棋子
  */
 function syncPiecesWithBoard() {
   if (!piecesGroup || !scene) return;
   
   console.log('开始同步3D棋子');
   
+  // 第一步：移除所有现有棋子
+  while(piecesGroup.children.length > 0) {
+    const child = piecesGroup.children[0];
+    piecesGroup.remove(child);
+    
+    // 释放资源
+    if (child instanceof THREE.Mesh) {
+      child.geometry.dispose();
+      if (Array.isArray(child.material)) {
+        child.material.forEach(mat => mat.dispose());
+      } else {
+        child.material.dispose();
+      }
+    }
+  }
+  
+  // 第二步：根据当前board状态重新创建所有棋子
   const board = chessStore.board;
   const startX = -((BOARD_WIDTH - 1) * CELL_SIZE) / 2;
   const startZ = -((BOARD_HEIGHT - 1) * CELL_SIZE) / 2;
   
-  // 第一步：收集所有被吃掉的棋子（isCaptured = true）
-  const capturedPieces: THREE.Mesh[] = [];
-  const piecesToRemove: THREE.Object3D[] = [];
-  
-  piecesGroup.children.forEach(child => {
-    if (child instanceof THREE.Mesh) {
-      const userData = child.userData as any;
-      if (userData.isCaptured) {
-        // 保留被吃掉的棋子
-        capturedPieces.push(child);
-      } else {
-        // 标记棋盘上的棋子待移除
-        piecesToRemove.push(child);
-      }
-    }
-  });
-  
-  // 第二步：移除所有棋盘上的棋子（保留被吃掉的棋子）
-  piecesToRemove.forEach(piece => {
-    piecesGroup.remove(piece);
-    if (piece instanceof THREE.Mesh) {
-      piece.geometry.dispose();
-      if (Array.isArray(piece.material)) {
-        piece.material.forEach(mat => mat.dispose());
-      } else {
-        piece.material.dispose();
-      }
-    }
-  });
-  
-  // 第三步：根据当前board状态重新创建棋盘上的棋子
+  // 记录每种棋子的计数，用于生成唯一编号
   const pieceCounter: Record<string, number> = {};
   
   for (let row = 0; row < BOARD_HEIGHT; row++) {
@@ -831,14 +822,18 @@ function syncPiecesWithBoard() {
         const isRed = piece > 0;
         let rotationY = 0;
         
-        if (opponentTextDirection === 'down') {
-          // 对方棋子字体方向：向下
-          // 红方字体旋转90度，黑方字体旋转-90度
-          rotationY = isRed ? Math.PI / 2 : -Math.PI / 2;
-        } else {
-          // 对方棋子字体方向：向上
-          // 红方字体旋转90度，黑方字体也旋转90度
+        if (isRed) {
+          // 红方：字体向右（顺时针90度），头部朝向楚河汉界（棋盘中心）
           rotationY = Math.PI / 2;
+        } else {
+          // 黑方：根据配置决定方向
+          if (opponentTextDirection === 'down') {
+            // 向下：字体向左（逆时针90度），头部朝向楚河汉界（棋盘中心）
+            rotationY = -Math.PI / 2;
+          } else {
+            // 向上：字体向右（顺时针90度），尾部朝向楚河汉界
+            rotationY = Math.PI / 2;
+          }
         }
         
         pieceMesh.rotation.y = rotationY;
@@ -862,7 +857,7 @@ function syncPiecesWithBoard() {
           owner: isRed ? '红' : '黑',
           pieceName: pieceName,
           uniqueId: uniqueId,
-          isCaptured: false  // 棋盘上的棋子都是活子
+          isCaptured: false
         };
         
         piecesGroup.add(pieceMesh);
@@ -870,12 +865,7 @@ function syncPiecesWithBoard() {
     }
   }
   
-  // 第四步：将被吃掉的棋子重新添加回场景
-  capturedPieces.forEach(capturedPiece => {
-    piecesGroup.add(capturedPiece);
-  });
-  
-  console.log(`3D棋子同步完成，共 ${piecesGroup.children.length} 个棋子（其中 ${capturedPieces.length} 个被吃掉）`);
+  console.log(`3D棋子同步完成，共创建 ${piecesGroup.children.length} 个棋子`);
 }
 
 /**
@@ -1103,7 +1093,7 @@ function executeMove(fromRow: number, fromCol: number, toRow: number, toCol: num
       let capturedCount = 0;
       piecesGroup.children.forEach(other => {
         if (other instanceof THREE.Mesh) {
-          const otherData = (other as any).userData;
+          const otherData = other.userData as any;
           if (otherData.isCaptured) {
             const otherIsRed = otherData.piece > 0;
             if (otherIsRed === isRed) {
@@ -1435,24 +1425,13 @@ function displayCheckmateAlert() {
  * 重置棋子位置到原位
  */
 function resetPiecePosition(pieceMesh: THREE.Mesh) {
-  const { row, col, piece } = (pieceMesh as any).userData;
+  const { row, col } = (pieceMesh as any).userData;
   const startX = -((BOARD_WIDTH - 1) * CELL_SIZE) / 2;
   const startZ = -((BOARD_HEIGHT - 1) * CELL_SIZE) / 2;
   
   pieceMesh.position.x = startX + col * CELL_SIZE;
   pieceMesh.position.z = startZ + row * CELL_SIZE;
-  
-  // 恢复正确的y坐标：根据棋子形状重新计算
-  const fullHeight = CELL_SIZE * 0.35;
-  const height = currentPieceShape === 'cylinder' ? fullHeight * 0.5 : fullHeight;
-  
-  if (currentPieceShape === 'cylinder') {
-    // 柱型：圆柱几何体中心在原点，要让底部在 y=0.01，需要上移 height/2
-    pieceMesh.position.y = 0.01 + height / 2;
-  } else {
-    // 鼓型：LatheGeometry 从 y=0 开始，直接放在棋盘上
-    pieceMesh.position.y = 0.01;
-  }
+  // 不要设置y坐标，保持createPieceMesh中设置的正确高度
 }
 
 /**
