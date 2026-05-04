@@ -1254,8 +1254,13 @@ onMounted(() => {
   initScene();
   window.addEventListener('resize', onWindowResize);
   
-  // 启动 AI 引擎
-  startEngine().then(() => {
+  // 加载配置并启动 AI 引擎
+  loadConfig().then(config => {
+    const enginePath = config.engine.pikafish_path;
+    console.log('准备启动AI引擎，路径:', enginePath);
+    
+    return startEngine(enginePath);
+  }).then(() => {
     engineStarted = true;
     console.log('AI 引擎已就绪');
   }).catch(error => {
