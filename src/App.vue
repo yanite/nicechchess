@@ -60,9 +60,13 @@ async function restoreWindowState() {
     
     const appWindow = getCurrentWindow();
     
-    // 设置窗口位置（使用Tauri v2 API）
+    // 设置窗口位置（使用Tauri v2 PhysicalPosition）
     try {
-      await appWindow.setPosition({ x: Math.round(state.x), y: Math.round(state.y) });
+      await appWindow.setPosition({ 
+        type: 'Physical',
+        x: Math.round(state.x), 
+        y: Math.round(state.y) 
+      });
       console.log('✓ 窗口位置已设置:', { x: state.x, y: state.y });
       
       // 验证位置是否设置成功
@@ -72,9 +76,13 @@ async function restoreWindowState() {
       console.error('✗ 设置窗口位置失败:', posError);
     }
     
-    // 设置窗口大小（使用Tauri v2 API）
+    // 设置窗口大小（使用Tauri v2 PhysicalSize）
     try {
-      await appWindow.setSize({ width: Math.round(state.width), height: Math.round(state.height) });
+      await appWindow.setSize({ 
+        type: 'Physical',
+        width: Math.round(state.width), 
+        height: Math.round(state.height) 
+      });
       console.log('✓ 窗口大小已设置:', { width: state.width, height: state.height });
       
       // 验证大小是否设置成功
