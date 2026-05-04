@@ -19,6 +19,7 @@
 | 9 | 窗口移动导致频繁重新编译 | 🔴 严重 | ✅ 已修复 |
 | 10 | config.rs 文件异常膨胀 | 🔴 严重 | ✅ 已修复 |
 | 11 | 窗口状态保存循环调用 | 🔴 严重 | ✅ 已修复 |
+| 12 | 配置管理架构优化 - 内存缓存 | 🟡 中等 | ✅ 已修复 |
 
 ---
 
@@ -431,6 +432,97 @@ window.on_window_event(move |event| {
 - ⚠️ 异步任务中必须考虑并发控制
 - ✅ 使用原子类型处理跨线程的状态标志
 - ✅ 防抖机制不仅要延迟执行，还要防止重复触发
+
+---
+
+### **Bug #12: 配置管理架构优化 - 内存缓存**
+
+**发现时间：** 2026-05-04  
+**影响范围：** `src-tauri/src/lib.rs`  
+**问题描述：**
+之前的实现在每次保存窗口状态时都会：
+1. 调用 `AppConfig::load()` 从文件读取配置（打印"配置加载成功"）
+2. 修改窗口相关字段
+3. 调用 `config.save()` 写入文件（打印"配置已保存"）
+
+这导致频繁的磁盘I/O和日志输出，即使只是移动窗口也会看到多次"配置加载成功"和"配置已保存"交替出现。
+
+**根本原因：**
+- 每次保存都重新从文件加载完整配置
+- 没有利用内存缓存，导致不必要的文件读取操作
+
+**修复方案：**
+
+使用 `Arc<Mutex<AppConfig>>` 在内存中维护配置副本：
+
+```rust
+use std::sync::{Arc, Mutex};
+
+pub fn run() {
+    tauri::Builder::default()
+        .setup(|app| {
+            // 启动时加载一次配置到内存
+            let config = AppConfig::load().unwrap_or_else(|_| /* 默认配置 */);
+            
+            // 将配置存储在 Arc<Mutex<>> 中，供后续使用
+            let shared_config = Arc::new(Mutex::new(config.clone()));
+            
+            // 恢复窗口状态
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.set_position(...);
+                let _ = window.set_size(...);
+                
+                // 监听窗口事件
+                let config_clone = shared_config.clone();
+                window.on_window_event(move |event| {
+                    match event {
+                        tauri::WindowEvent::Moved(_) | tauri::WindowEvent::Resized(_) => {
+                            // ... 防抖逻辑 ...
+                            
+                            std::thread::spawn(move || {
+                                // 更新内存中的配置（不读取文件）
+                                if let Ok(mut config) = cfg.lock() {
+                                    config.window.x = position.x;
+                                    config.window.y = position.y;
+                                    // ... 其他字段 ...
+                                    
+                                    // 直接保存到文件
+                                    config.save()?;
+                                }
+                            });
+                        }
+                        _ => {}
+                    }
+                });
+            }
+            
+            // 将共享配置存储到 Tauri 的状态管理中
+            app.manage(shared_config);
+            
+            Ok(())
+        })
+}
+```
+
+**关键改进：**
+1. ✅ **启动时只加载一次**：应用启动时从文件加载配置到内存
+2. ✅ **内存中维护副本**：使用 `Arc<Mutex<AppConfig>>` 在线程间安全共享
+3. ✅ **保存时不读取文件**：直接更新内存中的配置并保存，避免重复读取
+4. ✅ **支持前端访问**：通过 Tauri 的 `State` 机制暴露给前端命令
+5. ✅ **线程安全**：使用 `Mutex` 确保并发访问安全
+
+**验证方法：**
+1. 启动应用并快速多次移动窗口
+2. 观察日志，应该只看到"窗口状态已保存"，不再出现"配置加载成功"
+3. 配置文件内容正确更新
+
+**相关提交：** `c8f7d4e`
+
+**经验教训：**
+- ⚠️ 频繁的文件I/O会影响性能，应尽量减少不必要的读写操作
+- ✅ 使用内存缓存可以显著提升性能，特别是对于频繁更新的配置项
+- ✅ `Arc<Mutex<T>>` 是 Rust 中跨线程共享可变状态的标准模式
+- ✅ Tauri 的 `app.manage()` 可以将状态注入到命令系统中
 
 ---
 
