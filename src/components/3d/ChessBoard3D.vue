@@ -646,6 +646,103 @@ function getPieceChineseName(piece: PieceType): string {
 }
 
 /**
+ * 根据棋子类型和位置生成稳定的唯一ID
+ */
+function generateStablePieceId(piece: PieceType, row: number, col: number): string {
+  const isRed = piece > 0;
+  const colorPrefix = isRed ? '红' : '黑';
+  const pieceName = getPieceChineseName(piece);
+  // 使用位置作为ID的一部分，确保唯一性
+  return `${colorPrefix}${pieceName}_${row}_${col}`;
+}
+
+/**
+ * 同步3D棋子位置与store的棋盘状态
+ * 策略：清空现有棋子组，根据当前board状态重新创建所有棋子
+ */
+function syncPiecesWithBoard() {
+  if (!piecesGroup || !scene) return;
+  
+  console.log('开始同步3D棋子');
+  
+  // 第一步：移除所有现有棋子
+  while(piecesGroup.children.length > 0) {
+    const child = piecesGroup.children[0];
+    piecesGroup.remove(child);
+    
+    // 释放资源
+    if (child instanceof THREE.Mesh) {
+      child.geometry.dispose();
+      if (Array.isArray(child.material)) {
+        child.material.forEach(mat => mat.dispose());
+      } else {
+        child.material.dispose();
+      }
+    }
+  }
+  
+  // 第二步：根据当前board状态重新创建所有棋子
+  const board = chessStore.board;
+  const startX = -((BOARD_WIDTH - 1) * CELL_SIZE) / 2;
+  const startZ = -((BOARD_HEIGHT - 1) * CELL_SIZE) / 2;
+  
+  // 记录每种棋子的计数，用于生成唯一编号
+  const pieceCounter: Record<string, number> = {};
+  
+  for (let row = 0; row < BOARD_HEIGHT; row++) {
+    for (let col = 0; col < BOARD_WIDTH; col++) {
+      const piece = board[row][col];
+      if (piece !== PIECES.EMPTY) {
+        const pieceMesh = createPieceMesh(piece, row, col);
+        
+        // 设置位置
+        pieceMesh.position.x = startX + col * CELL_SIZE;
+        pieceMesh.position.z = startZ + row * CELL_SIZE;
+        pieceMesh.position.y = 0;
+        
+        // 设置文字朝向
+        const isRed = piece > 0;
+        if (!isRed && row < 5) {
+          pieceMesh.rotation.y = -Math.PI / 2;
+        } else if (isRed && row >= 5) {
+          pieceMesh.rotation.y = Math.PI / 2;
+        } else if (!isRed && row >= 5) {
+          pieceMesh.rotation.y = Math.PI / 2;
+        } else {
+          pieceMesh.rotation.y = -Math.PI / 2;
+        }
+        
+        // 生成唯一编号
+        const pieceName = getPieceChineseName(piece);
+        const colorPrefix = isRed ? '红' : '黑';
+        const key = `${colorPrefix}${pieceName}`;
+        
+        if (!pieceCounter[key]) {
+          pieceCounter[key] = 0;
+        }
+        pieceCounter[key]++;
+        
+        const uniqueId = `${key}${pieceCounter[key]}`;
+        
+        (pieceMesh as any).userData = { 
+          row, 
+          col, 
+          piece,
+          owner: isRed ? '红' : '黑',
+          pieceName: pieceName,
+          uniqueId: uniqueId,
+          isCaptured: false
+        };
+        
+        piecesGroup.add(pieceMesh);
+      }
+    }
+  }
+  
+  console.log(`3D棋子同步完成，共创建 ${piecesGroup.children.length} 个棋子`);
+}
+
+/**
  * 鼠标按下事件 - 开始拖动棋子或相机控制
  */
 function onMouseDown(event: MouseEvent) {
@@ -1247,75 +1344,6 @@ function hideCheckAlert() {
     // 隐藏提示
     showCheckAlert.value = false;
   }
-}
-
-/**
- * 同步3D棋子位置与store的棋盘状态
- */
-function syncPiecesWithBoard() {
-  if (!piecesGroup) return;
-  
-  const board = chessStore.board;
-  const startX = -((BOARD_WIDTH - 1) * CELL_SIZE) / 2;
-  const startZ = -((BOARD_HEIGHT - 1) * CELL_SIZE) / 2;
-  
-  // 创建当前棋盘状态的映射：piece -> position
-  const currentPositions: Map<string, { row: number; col: number }> = new Map();
-  
-  for (let row = 0; row < BOARD_HEIGHT; row++) {
-    for (let col = 0; col < BOARD_WIDTH; col++) {
-      const piece = board[row][col];
-      if (piece !== PIECES.EMPTY) {
-        const key = `${piece}_${row}_${col}`;
-        currentPositions.set(key, { row, col });
-      }
-    }
-  }
-  
-  // 遍历所有3D棋子，更新位置或隐藏被吃掉的棋子
-  piecesGroup.children.forEach((child) => {
-    const mesh = child as THREE.Mesh;
-    const userData = mesh.userData as any;
-    
-    if (!userData || !userData.uniqueId) return;
-    
-    // 在currentPositions中查找这个棋子
-    let found = false;
-    let targetRow = -1;
-    let targetCol = -1;
-    
-    for (const [key, pos] of currentPositions.entries()) {
-      // 通过uniqueId匹配棋子
-      const storedPiece = chessStore.board[pos.row][pos.col];
-      const isRed = storedPiece > 0;
-      const pieceName = getPieceChineseName(storedPiece);
-      const colorPrefix = isRed ? '红' : '黑';
-      const expectedId = `${colorPrefix}${pieceName}`;
-      
-      // 检查是否是同一个棋子（通过位置和类型判断）
-      if (mesh.position.x === startX + pos.col * CELL_SIZE && 
-          mesh.position.z === startZ + pos.row * CELL_SIZE) {
-        found = true;
-        targetRow = pos.row;
-        targetCol = pos.col;
-        break;
-      }
-    }
-    
-    if (found) {
-      // 棋子还在棋盘上，确保它可见
-      mesh.visible = true;
-      mesh.position.y = 0; // 正常高度
-      mesh.userData.isCaptured = false;
-    } else {
-      // 棋子可能被吃掉了，隐藏它
-      mesh.visible = false;
-      mesh.userData.isCaptured = true;
-    }
-  });
-  
-  // 检查是否有新出现的棋子（理论上不应该发生，但为了完整性）
-  // TODO: 如果需要支持升变等会生成新棋子的规则，这里需要处理
 }
 
 // 监听棋盘状态变化，同步3D视图
