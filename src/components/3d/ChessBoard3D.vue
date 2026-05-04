@@ -19,6 +19,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { Line2 } from 'three/examples/jsm/lines/Line2.js';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js';
+import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js';
 import { useChessStore } from '../../store/chessStore';
 import { PIECES, type PieceType, type Board, UCIToMove } from '../../logic/chess/constants';
 import { isValidMove, isInCheck } from '../../logic/chess/rules';
@@ -219,25 +220,38 @@ function createBoard(texturePath: string) {
   const boardHeight = (BOARD_HEIGHT - 1) * CELL_SIZE + BOARD_MARGIN_Z * 2;
   const boardGeometry = new THREE.BoxGeometry(boardWidth, 0.2, boardHeight);
   
-  // 加载纹理
+  // 初始化加载器
   const textureLoader = new THREE.TextureLoader();
+  const exrLoader = new EXRLoader();
+  
+  // 创建基础材质
   let boardMaterial: THREE.MeshStandardMaterial;
   
   // 尝试加载纹理，如果失败则使用默认颜色
   try {
     console.log('尝试加载棋盘纹理:', texturePath);
-    const texture = textureLoader.load(
+    
+    // 从路径中提取基础名称（不含扩展名和目录）
+    const basePath = texturePath.replace(/\.(jpg|jpeg|png)$/i, '');
+    
+    // 构建 EXR 文件路径
+    const normalMapPath = basePath + '_nor_gl_1k.exr';
+    const roughnessMapPath = basePath + '_rough_1k.exr';
+    
+    // 加载基础颜色贴图（JPG/PNG）
+    const diffuseTexture = textureLoader.load(
       texturePath,
       (loadedTexture) => {
-        console.log('棋盘纹理加载成功:', texturePath);
+        console.log('棋盘颜色贴图加载成功:', texturePath);
         loadedTexture.wrapS = THREE.RepeatWrapping;
         loadedTexture.wrapT = THREE.RepeatWrapping;
         loadedTexture.repeat.set(1, 1);
+        // 设置色彩空间为 sRGB
+        loadedTexture.colorSpace = THREE.SRGBColorSpace;
       },
       undefined,
       (error) => {
-        console.warn('棋盘纹理加载失败，使用默认木纹颜色:', error);
-        console.warn('纹理路径:', texturePath);
+        console.warn('棋盘颜色贴图加载失败，使用默认木纹颜色:', error);
         // 降级到默认木纹颜色
         boardMaterial = new THREE.MeshStandardMaterial({ 
           color: 0xDEB887,  // 实木色
@@ -246,11 +260,42 @@ function createBoard(texturePath: string) {
       }
     );
     
-    // 如果纹理加载成功，使用纹理材质
+    // 创建材质（先只设置基础贴图）
     boardMaterial = new THREE.MeshStandardMaterial({ 
-      map: texture,
-      roughness: 0.7 
+      map: diffuseTexture,
+      roughness: 1.0,
+      metalness: 0.0,
     });
+    
+    // 异步加载法线贴图（EXR格式）
+    exrLoader.load(
+      normalMapPath,
+      (normalTexture) => {
+        console.log('法线贴图加载成功:', normalMapPath);
+        boardMaterial.normalMap = normalTexture;
+        boardMaterial.normalScale = new THREE.Vector2(1, 1);
+        boardMaterial.needsUpdate = true;
+      },
+      undefined,
+      (error) => {
+        console.warn('法线贴图加载失败，跳过:', normalMapPath, error);
+      }
+    );
+    
+    // 异步加载粗糙度贴图（EXR格式）
+    exrLoader.load(
+      roughnessMapPath,
+      (roughnessTexture) => {
+        console.log('粗糙度贴图加载成功:', roughnessMapPath);
+        boardMaterial.roughnessMap = roughnessTexture;
+        boardMaterial.needsUpdate = true;
+      },
+      undefined,
+      (error) => {
+        console.warn('粗糙度贴图加载失败，跳过:', roughnessMapPath, error);
+      }
+    );
+    
   } catch (error) {
     console.error('纹理加载异常，使用默认颜色:', error);
     boardMaterial = new THREE.MeshStandardMaterial({ 
