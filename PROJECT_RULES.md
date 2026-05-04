@@ -71,10 +71,49 @@ git push
 1. ✅ **CMD（命令提示符）**
 2. ✅ **Git Bash**
 
+### 🔧 Rust 编译环境配置（重要！）
+
+**执行任何 Rust 相关的命令前，必须先执行 `vcvars64.bat` 初始化 Visual Studio 编译环境，否则 Rust 会启动失败！**
+
+#### 操作步骤
+
+1. **打开 CMD 或 Git Bash**
+2. **执行 vcvars64.bat**（路径根据 Visual Studio 版本可能不同）：
+   ```batch
+   "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
+   ```
+   或者对于 Professional 版本：
+   ```batch
+   "C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Auxiliary\Build\vcvars64.bat"
+   ```
+3. **然后执行 Rust 相关命令**：
+   ```bash
+   npm run tauri dev
+   # 或其他 cargo 命令
+   ```
+
+#### 常见 vcvars64.bat 路径
+
+- **Visual Studio 2022 Community**:
+  `C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat`
+  
+- **Visual Studio 2022 Professional**:
+  `C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Auxiliary\Build\vcvars64.bat`
+  
+- **Visual Studio 2019**:
+  `C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvars64.bat`
+
+#### 为什么需要执行 vcvars64.bat？
+
+- 设置 MSVC 编译器环境变量
+- 配置正确的链接器路径
+- 确保 Rust 能找到 Windows SDK 和编译工具
+- 避免链接器错误和编译失败
+
 ### 特别注意
 
-- 运行 `npm run tauri dev` 等Tauri命令时必须避免PowerShell
-- Rust编译相关操作也需要在非PowerShell环境下进行
+- ❌ **运行 `npm run tauri dev` 等Tauri命令时必须避免PowerShell**
+- ✅ **Rust编译相关操作必须在执行 vcvars64.bat 后进行**
 - PowerShell可能导致：
   - Rust链接器路径问题（使用Git Bash的`/usr/bin/link.exe`而非MSVC链接器）
   - 环境变量解析差异
