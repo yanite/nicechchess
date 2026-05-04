@@ -531,14 +531,36 @@ function createPieces() {
 }
 
 /**
- * 创建单个棋子网格（带文字）
+ * 创建单个棋子网格（带文字）- 使用鼓型设计
  */
 function createPieceMesh(piece: PieceType, _row: number, _col: number): THREE.Mesh {
-  const radius = CELL_SIZE * 0.4;
-  const height = CELL_SIZE * 0.35; // 增加棋子厚度从0.25到0.35
+  const baseRadius = CELL_SIZE * 0.4; // 基础半径
+  const height = CELL_SIZE * 0.35;    // 棋子高度
+  const bulgeAmount = CELL_SIZE * 0.08; // 鼓出程度
   
-  // 圆柱体几何
-  const geometry = new THREE.CylinderGeometry(radius, radius, height, 32);
+  // 创建鼓型轮廓点
+  const points: THREE.Vector2[] = [];
+  const segments = 16; // 垂直采样点
+  
+  for (let i = 0; i <= segments; i++) {
+    const t = i / segments; // 0 到 1
+    const y = (t - 0.5) * height; // y 轴从 -height/2 到 height/2
+    
+    // 使用正弦函数实现"中间鼓、上下缩"的圆弧
+    const radius = baseRadius + Math.sin(t * Math.PI) * bulgeAmount;
+    
+    points.push(new THREE.Vector2(radius, y));
+  }
+  
+  // 封闭顶部和底部，让它看起来是实心的
+  const allPoints = [
+    new THREE.Vector2(0, -height / 2), // 底圆中心点
+    ...points,
+    new THREE.Vector2(0, height / 2)   // 顶圆中心点
+  ];
+  
+  // 使用 LatheGeometry 旋转成型
+  const geometry = new THREE.LatheGeometry(allPoints, 64); // 64 是径向分段
   
   // 根据棋子颜色设置材质
   const isRed = piece > 0;
@@ -550,26 +572,25 @@ function createPieceMesh(piece: PieceType, _row: number, _col: number): THREE.Me
   const topMaterial = new THREE.MeshStandardMaterial({
     map: texture,
     color: 0xffffff,
-    roughness: 0.5,
+    roughness: 0.4,
     metalness: 0.1,
   });
   
-  // 侧面材质
+  // 侧面材质（木质质感）
   const sideMaterial = new THREE.MeshStandardMaterial({
-    color: isRed ? 0xFF6B6B : 0x333333,
-    roughness: 0.6,
-    metalness: 0.2,
+    color: isRed ? 0xFF6B6B : 0x4a4a4a,
+    roughness: 0.5,
+    metalness: 0.15,
   });
   
   // 底部材质
   const bottomMaterial = new THREE.MeshStandardMaterial({
-    color: isRed ? 0xCC0000 : 0x1a1a1a,
-    roughness: 0.7,
+    color: isRed ? 0xCC0000 : 0x2a2a2a,
+    roughness: 0.6,
     metalness: 0.1,
   });
   
-  // 为圆柱体的不同面应用不同材质
-  // CylinderGeometry 的材质索引顺序: [侧面, 顶面, 底面]
+  // LatheGeometry 的材质索引顺序: [侧面, 顶面, 底面]
   const materials = [
     sideMaterial,   // 侧面
     topMaterial,    // 顶部
@@ -577,7 +598,7 @@ function createPieceMesh(piece: PieceType, _row: number, _col: number): THREE.Me
   ];
   
   const mesh = new THREE.Mesh(geometry, materials);
-  mesh.position.y = height / 2;
+  mesh.position.y = 0; // 居中放置
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   
