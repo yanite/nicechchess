@@ -54,6 +54,9 @@ let draggedPiece: THREE.Mesh | null = null; // 当前拖动的棋子
 let isDragging = false; // 是否正在拖动
 let dragOffset = new THREE.Vector3(); // 拖动偏移量
 
+// 棋子形状配置
+let currentPieceShape: 'cylinder' | 'standard' = 'cylinder';
+
 // 棋盘尺寸配置
 const BOARD_WIDTH = 9;
 const BOARD_HEIGHT = 10;
@@ -72,7 +75,9 @@ async function initScene() {
   try {
     const config = await loadConfig();
     boardTexturePath = config.ui.board_texture;
+    currentPieceShape = config.ui.piece_shape || 'cylinder'; // 加载棋子形状
     console.log('加载棋盘纹理配置:', boardTexturePath);
+    console.log('加载棋子形状配置:', currentPieceShape);
   } catch (error) {
     console.warn('加载配置失败，使用默认纹理:', error);
   }
@@ -590,36 +595,42 @@ function createWoodTexture(): THREE.CanvasTexture {
 }
 
 /**
- * 创建单个棋子网格（带文字）- 使用鼓型设计
+ * 创建单个棋子网格（带文字）- 支持柱型和鼓型
  */
 function createPieceMesh(piece: PieceType, _row: number, _col: number): THREE.Mesh {
   const baseRadius = CELL_SIZE * 0.4; // 基础半径
   const height = CELL_SIZE * 0.35;    // 棋子高度
-  const bulgeAmount = CELL_SIZE * 0.08; // 鼓出程度
   
-  // 创建鼓型轮廓点（从底部到顶部，y从0到height）
-  const points: THREE.Vector2[] = [];
-  const segments = 16; // 垂直采样点
+  let geometry: THREE.BufferGeometry;
   
-  for (let i = 0; i <= segments; i++) {
-    const t = i / segments; // 0 到 1
-    const y = t * height; // y 轴从 0 到 height
+  if (currentPieceShape === 'cylinder') {
+    // 柱型：使用 CylinderGeometry
+    geometry = new THREE.CylinderGeometry(baseRadius, baseRadius, height, 32);
+  } else {
+    // 鼓型：使用 LatheGeometry
+    const bulgeAmount = CELL_SIZE * 0.08; // 鼓出程度
+    const points: THREE.Vector2[] = [];
+    const segments = 16; // 垂直采样点
     
-    // 使用正弦函数实现"中间鼓、上下缩"的圆弧
-    const radius = baseRadius + Math.sin(t * Math.PI) * bulgeAmount;
+    for (let i = 0; i <= segments; i++) {
+      const t = i / segments; // 0 到 1
+      const y = t * height; // y 轴从 0 到 height
+      
+      // 使用正弦函数实现"中间鼓、上下缩"的圆弧
+      const radius = baseRadius + Math.sin(t * Math.PI) * bulgeAmount;
+      
+      points.push(new THREE.Vector2(radius, y));
+    }
     
-    points.push(new THREE.Vector2(radius, y));
+    // 封闭底部和顶部，让它看起来是实心的
+    const allPoints = [
+      new THREE.Vector2(0, 0),         // 底部中心点
+      ...points,
+      new THREE.Vector2(0, height)     // 顶部中心点
+    ];
+    
+    geometry = new THREE.LatheGeometry(allPoints, 64); // 64 是径向分段
   }
-  
-  // 封闭底部和顶部，让它看起来是实心的
-  const allPoints = [
-    new THREE.Vector2(0, 0),         // 底部中心点
-    ...points,
-    new THREE.Vector2(0, height)     // 顶部中心点
-  ];
-  
-  // 使用 LatheGeometry 旋转成型
-  const geometry = new THREE.LatheGeometry(allPoints, 64); // 64 是径向分段
   
   // 根据棋子颜色设置材质
   const isRed = piece > 0;
@@ -1467,6 +1478,50 @@ watch(
   { deep: true }
 );
 
+// 监听配置变化（通过轮询检测localStorage）
+let lastConfig = '';
+const checkConfigChange = setInterval(() => {
+  const currentConfig = localStorage.getItem('chchess_config') || '';
+  if (currentConfig !== lastConfig && lastConfig !== '') {
+    lastConfig = currentConfig;
+    console.log('检测到配置变化，重新加载棋子形状');
+    try {
+      const config = JSON.parse(currentConfig);
+      if (config.ui && config.ui.piece_shape && config.ui.piece_shape !== currentPieceShape) {
+        updatePieceShape(config.ui.piece_shape);
+      }
+    } catch (error) {
+      console.error('解析配置失败:', error);
+    }
+  } else if (lastConfig === '') {
+    lastConfig = currentConfig;
+  }
+}, 1000); // 每秒检查一次
+
+// 清理定时器
+const originalBeforeUnmount = onBeforeUnmount;
+onBeforeUnmount(() => {
+  originalBeforeUnmount();
+  clearInterval(checkConfigChange);
+});
+
+// 监听localStorage变化（配置变更）
+const handleStorageChange = (e: StorageEvent) => {
+  if (e.key === 'chchess_config') {
+    console.log('检测到配置变化，重新加载棋子形状');
+    try {
+      const config = JSON.parse(e.newValue || '{}');
+      if (config.ui && config.ui.piece_shape) {
+        updatePieceShape(config.ui.piece_shape);
+      }
+    } catch (error) {
+      console.error('解析配置失败:', error);
+    }
+  }
+};
+
+window.addEventListener('storage', handleStorageChange);
+
 // 监听currentMoveIndex变化（用于悔棋/重做后更新UI）
 watch(
   () => chessStore.currentMoveIndex,
@@ -1483,6 +1538,10 @@ onMounted(() => {
   
   // 加载配置并启动 AI 引擎
   loadConfig().then(config => {
+    // 更新全局棋子形状配置
+    currentPieceShape = config.ui.piece_shape;
+    console.log('棋子形状配置加载:', currentPieceShape);
+
     const enginePath = config.engine.pikafish_path;
     console.log('准备启动AI引擎，路径:', enginePath);
     
@@ -1545,7 +1604,28 @@ onMounted(() => {
   };
 });
 
+/**
+ * 更新棋子形状配置并重建所有棋子
+ */
+function updatePieceShape(shape: 'cylinder' | 'standard') {
+  console.log('更新棋子形状:', shape);
+  currentPieceShape = shape;
+  
+  // 重建所有棋子
+  syncPiecesWithBoard();
+}
+
+// 暴露方法给父组件
+defineExpose({
+  updatePieceShape
+});
+
 onBeforeUnmount(() => {
+  // 清理配置检查定时器
+  if (checkConfigChange) {
+    clearInterval(checkConfigChange);
+  }
+  
   window.removeEventListener('resize', onWindowResize);
   
   // 清理提示定时器
