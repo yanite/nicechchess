@@ -41,19 +41,10 @@ pub struct UIConfig {
 }
 
 impl AppConfig {
-    /// 获取配置文件路径（使用系统配置目录）
+    /// 获取配置文件路径（使用项目根目录）
     fn get_config_path() -> PathBuf {
-        // 使用系统配置目录，避免在项目目录中保存配置导致Tauri重新编译
-        let config_dir = dirs::config_dir()
-            .expect("无法获取系统配置目录")
-            .join("chchess");
-        
-        // 确保目录存在
-        if !config_dir.exists() {
-            fs::create_dir_all(&config_dir).expect("创建配置目录失败");
-        }
-        
-        config_dir.join("config.yaml")
+        // 配置文件保存在项目根目录，vite.config.ts 中已忽略监听 "**/config.yaml"
+        PathBuf::from("config.yaml")
     }
 
     /// 加载配置
