@@ -568,39 +568,29 @@ function createPieceMesh(piece: PieceType, _row: number, _col: number): THREE.Me
   // 创建带文字的纹理
   const texture = createPieceTexture(piece, isRed);
   
-  // 顶部材质（带文字）
-  const topMaterial = new THREE.MeshStandardMaterial({
-    map: texture,
-    color: 0xffffff,
-    roughness: 0.4,
-    metalness: 0.1,
-  });
-  
-  // 侧面材质（木质质感）
+  // 侧面材质（木质质感）- LatheGeometry 主要显示这个材质
   const sideMaterial = new THREE.MeshStandardMaterial({
     color: isRed ? 0xFF6B6B : 0x4a4a4a,
     roughness: 0.5,
     metalness: 0.15,
   });
   
-  // 底部材质
-  const bottomMaterial = new THREE.MeshStandardMaterial({
-    color: isRed ? 0xCC0000 : 0x2a2a2a,
-    roughness: 0.6,
-    metalness: 0.1,
-  });
-  
-  // LatheGeometry 的材质索引顺序: [侧面, 顶面, 底面]
-  const materials = [
-    sideMaterial,   // 侧面
-    topMaterial,    // 顶部
-    bottomMaterial, // 底部
-  ];
-  
-  const mesh = new THREE.Mesh(geometry, materials);
+  const mesh = new THREE.Mesh(geometry, sideMaterial);
   mesh.position.y = 0; // 居中放置
   mesh.castShadow = true;
   mesh.receiveShadow = true;
+  
+  // 添加顶部文字贴图（作为单独的平面）
+  const textGeometry = new THREE.CircleGeometry(baseRadius * 0.9, 32);
+  const textMaterial = new THREE.MeshStandardMaterial({
+    map: texture,
+    transparent: true,
+    side: THREE.DoubleSide,
+  });
+  const textMesh = new THREE.Mesh(textGeometry, textMaterial);
+  textMesh.rotation.x = -Math.PI / 2; // 水平放置
+  textMesh.position.y = height / 2 + 0.001; // 略微高于顶部，避免z-fighting
+  mesh.add(textMesh);
   
   return mesh;
 }
