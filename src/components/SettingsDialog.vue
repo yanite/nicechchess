@@ -99,7 +99,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { loadConfig, saveConfig, scanTextureDirectories } from '../services/configService';
-import { open } from '@tauri-apps/plugin-dialog';
 
 interface Settings {
   engine: {
