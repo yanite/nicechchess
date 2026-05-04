@@ -16,154 +16,171 @@
               v-model="settings.engine.pikafish_path" 
               readonly 
               placeholder="点击选择pikafish引擎路径"
+              class="custom-input"
             />
-            <button @click="selectEnginePath">浏览...</button>
+            <button @click="selectEnginePath" class="custom-button">浏览...</button>
           </div>
         </div>
 
         <!-- 2. 棋盘纹理 -->
         <div class="setting-item">
           <label>棋盘纹理：</label>
-          <select v-model="selectedTexture" @change="onTextureChange">
-            <option v-for="texture in availableTextures" :key="texture.value" :value="texture.value">
-              {{ texture.label }}
-            </option>
-          </select>
+          <div class="custom-select-wrapper">
+            <select v-model="selectedTexture" @change="onTextureChange" class="custom-select">
+              <option v-for="texture in availableTextures" :key="texture.value" :value="texture.value">
+                {{ texture.label }}
+              </option>
+            </select>
+          </div>
           <input 
             v-if="selectedTexture === 'custom'" 
             type="file" 
             accept="image/*" 
             @change="onCustomTextureUpload"
-            style="margin-top: 8px;"
+            class="custom-file-input"
           />
         </div>
 
         <!-- 3. 对方棋子字体方向 -->
         <div class="setting-item">
           <label>对方棋子字体方向：</label>
-          <div class="radio-group">
-            <label>
-              <input 
-                type="radio" 
-                value="down" 
-                v-model="settings.ui.opponent_text_direction"
-                @change="saveSettings"
-              />
-              向下（默认）
-            </label>
-            <label>
-              <input 
-                type="radio" 
-                value="up" 
-                v-model="settings.ui.opponent_text_direction"
-                @change="saveSettings"
-              />
-              向上
-            </label>
+          <div class="custom-radio-group">
+            <div 
+              class="custom-radio" 
+              :class="{ active: settings.ui.opponent_text_direction === 'down' }"
+              @click="setOpponentDirection('down')"
+            >
+              <span class="radio-indicator"></span>
+              <span class="radio-label">向下（默认）</span>
+            </div>
+            <div 
+              class="custom-radio" 
+              :class="{ active: settings.ui.opponent_text_direction === 'up' }"
+              @click="setOpponentDirection('up')"
+            >
+              <span class="radio-indicator"></span>
+              <span class="radio-label">向上</span>
+            </div>
           </div>
         </div>
 
         <!-- 4. 棋子形状 -->
         <div class="setting-item">
           <label>棋子形状：</label>
-          <div class="radio-group">
-            <label>
-              <input 
-                type="radio" 
-                value="cylinder" 
-                v-model="settings.ui.piece_shape"
-                @change="saveSettings"
-              />
-              圆柱形（默认）
-            </label>
-            <label>
-              <input 
-                type="radio" 
-                value="standard" 
-                v-model="settings.ui.piece_shape"
-                @change="saveSettings"
-              />
-              标准型
-            </label>
+          <div class="custom-radio-group">
+            <div 
+              class="custom-radio" 
+              :class="{ active: settings.ui.piece_shape === 'cylinder' }"
+              @click="setPieceShape('cylinder')"
+            >
+              <span class="radio-indicator"></span>
+              <span class="radio-label">圆柱形（默认）</span>
+            </div>
+            <div 
+              class="custom-radio" 
+              :class="{ active: settings.ui.piece_shape === 'standard' }"
+              @click="setPieceShape('standard')"
+            >
+              <span class="radio-indicator"></span>
+              <span class="radio-label">标准型</span>
+            </div>
           </div>
         </div>
 
         <!-- 5. AI线程数 -->
         <div class="setting-item">
           <label>AI线程数：</label>
-          <input 
-            type="number" 
-            v-model.number="settings.engine.threads"
-            min="1"
-            max="64"
-            @change="validateAndSaveThreads"
-          />
+          <div class="number-input-wrapper">
+            <button class="number-btn minus" @click="decrementThreads">-</button>
+            <input 
+              type="number" 
+              v-model.number="settings.engine.threads"
+              min="1"
+              max="64"
+              @change="validateAndSaveThreads"
+              class="custom-number-input"
+            />
+            <button class="number-btn plus" @click="incrementThreads">+</button>
+          </div>
           <span class="hint">建议值：CPU核心数的一半</span>
         </div>
 
         <!-- 6. AI哈希表大小 -->
         <div class="setting-item">
           <label>AI哈希表大小 (MB)：</label>
-          <input 
-            type="number" 
-            v-model.number="settings.engine.hash"
-            min="16"
-            max="32768"
-            step="256"
-            @change="validateAndSaveHash"
-          />
+          <div class="number-input-wrapper">
+            <button class="number-btn minus" @click="decrementHash">-</button>
+            <input 
+              type="number" 
+              v-model.number="settings.engine.hash"
+              min="16"
+              max="32768"
+              step="256"
+              @change="validateAndSaveHash"
+              class="custom-number-input"
+            />
+            <button class="number-btn plus" @click="incrementHash">+</button>
+          </div>
           <span class="hint">范围：16-32768 MB，默认 2048</span>
         </div>
 
         <!-- 7. AI计算模式 -->
         <div class="setting-item">
           <label>AI计算模式：</label>
-          <div class="radio-group">
-            <label>
-              <input 
-                type="radio" 
-                value="depth" 
-                v-model="settings.engine.calculation_mode"
-                @change="saveSettings"
-              />
-              按深度计算
-            </label>
-            <label>
-              <input 
-                type="radio" 
-                value="time" 
-                v-model="settings.engine.calculation_mode"
-                @change="saveSettings"
-              />
-              按时间计算
-            </label>
+          <div class="custom-radio-group">
+            <div 
+              class="custom-radio" 
+              :class="{ active: settings.engine.calculation_mode === 'depth' }"
+              @click="setCalculationMode('depth')"
+            >
+              <span class="radio-indicator"></span>
+              <span class="radio-label">按深度计算</span>
+            </div>
+            <div 
+              class="custom-radio" 
+              :class="{ active: settings.engine.calculation_mode === 'time' }"
+              @click="setCalculationMode('time')"
+            >
+              <span class="radio-indicator"></span>
+              <span class="radio-label">按时间计算</span>
+            </div>
           </div>
         </div>
 
         <!-- 8. 搜索深度 -->
         <div v-if="settings.engine.calculation_mode === 'depth'" class="setting-item">
           <label>搜索深度：</label>
-          <input 
-            type="number" 
-            v-model.number="settings.engine.depth"
-            min="1"
-            max="100"
-            @change="validateAndSaveDepth"
-          />
+          <div class="number-input-wrapper">
+            <button class="number-btn minus" @click="decrementDepth">-</button>
+            <input 
+              type="number" 
+              v-model.number="settings.engine.depth"
+              min="1"
+              max="100"
+              @change="validateAndSaveDepth"
+              class="custom-number-input"
+            />
+            <button class="number-btn plus" @click="incrementDepth">+</button>
+          </div>
           <span class="hint">范围：1-100，默认 20</span>
         </div>
 
         <!-- 9. 思考时间 -->
         <div v-if="settings.engine.calculation_mode === 'time'" class="setting-item">
           <label>每步思考时间 (毫秒)：</label>
-          <input 
-            type="number" 
-            v-model.number="settings.engine.movetime"
-            min="100"
-            max="3000"
-            step="100"
-            @change="validateAndSaveMovetime"
-          />
+          <div class="number-input-wrapper">
+            <button class="number-btn minus" @click="decrementMovetime">-</button>
+            <input 
+              type="number" 
+              v-model.number="settings.engine.movetime"
+              min="100"
+              max="3000"
+              step="100"
+              @change="validateAndSaveMovetime"
+              class="custom-number-input"
+            />
+            <button class="number-btn plus" @click="incrementMovetime">+</button>
+          </div>
           <span class="hint">范围：100-3000 ms，默认 1000</span>
         </div>
       </div>
@@ -284,7 +301,27 @@ async function scanAvailableTextures() {
 // 保存配置
 async function saveSettings() {
   try {
-    await saveConfig(settings.value);
+    // 加载完整配置
+    const fullConfig = await loadConfig();
+    
+    // 更新引擎和UI配置
+    fullConfig.engine = {
+      pikafish_path: settings.value.engine.pikafish_path,
+      threads: settings.value.engine.threads,
+      hash: settings.value.engine.hash,
+      calculation_mode: settings.value.engine.calculation_mode,
+      movetime: settings.value.engine.movetime,
+      depth: settings.value.engine.depth
+    };
+    
+    fullConfig.ui = {
+      board_texture: settings.value.ui.board_texture,
+      opponent_text_direction: settings.value.ui.opponent_text_direction,
+      piece_shape: settings.value.ui.piece_shape
+    };
+    
+    // 保存完整配置
+    await saveConfig(fullConfig);
     emit('settings-changed', settings.value);
     console.log('设置已保存:', settings.value);
   } catch (error) {
@@ -330,6 +367,84 @@ function validateAndSaveMovetime() {
     settings.value.engine.movetime = 3000;
   }
   saveSettings();
+}
+
+// 设置对方棋子方向
+function setOpponentDirection(direction: 'down' | 'up') {
+  settings.value.ui.opponent_text_direction = direction;
+  saveSettings();
+}
+
+// 设置棋子形状
+function setPieceShape(shape: 'cylinder' | 'standard') {
+  settings.value.ui.piece_shape = shape;
+  saveSettings();
+}
+
+// 设置计算模式
+function setCalculationMode(mode: 'time' | 'depth') {
+  settings.value.engine.calculation_mode = mode;
+  saveSettings();
+}
+
+// 线程数增减
+function incrementThreads() {
+  if (settings.value.engine.threads < 64) {
+    settings.value.engine.threads++;
+    saveSettings();
+  }
+}
+
+function decrementThreads() {
+  if (settings.value.engine.threads > 1) {
+    settings.value.engine.threads--;
+    saveSettings();
+  }
+}
+
+// Hash大小增减
+function incrementHash() {
+  if (settings.value.engine.hash < 32768) {
+    settings.value.engine.hash += 256;
+    saveSettings();
+  }
+}
+
+function decrementHash() {
+  if (settings.value.engine.hash > 16) {
+    settings.value.engine.hash -= 256;
+    saveSettings();
+  }
+}
+
+// 深度增减
+function incrementDepth() {
+  if (settings.value.engine.depth < 100) {
+    settings.value.engine.depth++;
+    saveSettings();
+  }
+}
+
+function decrementDepth() {
+  if (settings.value.engine.depth > 1) {
+    settings.value.engine.depth--;
+    saveSettings();
+  }
+}
+
+// 思考时间增减
+function incrementMovetime() {
+  if (settings.value.engine.movetime < 3000) {
+    settings.value.engine.movetime += 100;
+    saveSettings();
+  }
+}
+
+function decrementMovetime() {
+  if (settings.value.engine.movetime > 100) {
+    settings.value.engine.movetime -= 100;
+    saveSettings();
+  }
 }
 
 // 选择引擎路径
@@ -529,5 +644,209 @@ select {
 
 .dialog-footer button:hover {
   background-color: #7f8c8d;
+}
+
+/* 自定义输入框样式 */
+.custom-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 2px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: all 0.3s;
+  background-color: #fafafa;
+}
+
+.custom-input:focus {
+  outline: none;
+  border-color: #3498db;
+  background-color: white;
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+}
+
+.custom-button {
+  padding: 10px 20px;
+  background-color: #3498db;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s;
+}
+
+.custom-button:hover {
+  background-color: #2980b9;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(52, 152, 219, 0.3);
+}
+
+/* 自定义下拉框样式 */
+.custom-select-wrapper {
+  position: relative;
+}
+
+.custom-select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 2px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 14px;
+  background-color: white;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  transition: all 0.3s;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%233498db' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px;
+}
+
+.custom-select:focus {
+  outline: none;
+  border-color: #3498db;
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+}
+
+.custom-select:hover {
+  border-color: #3498db;
+}
+
+/* 自定义文件输入 */
+.custom-file-input {
+  margin-top: 8px;
+  padding: 8px;
+  border: 2px dashed #e0e0e0;
+  border-radius: 6px;
+  width: 100%;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.custom-file-input:hover {
+  border-color: #3498db;
+  background-color: #f8f9fa;
+}
+
+/* 自定义单选框组 */
+.custom-radio-group {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.custom-radio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: 2px solid #e0e0e0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s;
+  background-color: white;
+  user-select: none;
+}
+
+.custom-radio:hover {
+  border-color: #3498db;
+  background-color: #f8f9fa;
+}
+
+.custom-radio.active {
+  border-color: #3498db;
+  background-color: #ebf5fb;
+}
+
+.radio-indicator {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #bdc3c7;
+  border-radius: 50%;
+  position: relative;
+  transition: all 0.3s;
+}
+
+.custom-radio.active .radio-indicator {
+  border-color: #3498db;
+  background-color: #3498db;
+}
+
+.custom-radio.active .radio-indicator::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 8px;
+  height: 8px;
+  background-color: white;
+  border-radius: 50%;
+}
+
+.radio-label {
+  font-size: 14px;
+  color: #2c3e50;
+  font-weight: 500;
+}
+
+/* 数字输入框包装器 */
+.number-input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.custom-number-input {
+  width: 100px;
+  padding: 10px 12px;
+  border: 2px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 14px;
+  text-align: center;
+  transition: all 0.3s;
+}
+
+.custom-number-input:focus {
+  outline: none;
+  border-color: #3498db;
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+}
+
+.number-btn {
+  width: 36px;
+  height: 36px;
+  border: 2px solid #e0e0e0;
+  background-color: white;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: bold;
+  color: #3498db;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.number-btn:hover {
+  border-color: #3498db;
+  background-color: #ebf5fb;
+  transform: scale(1.05);
+}
+
+.number-btn:active {
+  transform: scale(0.95);
+}
+
+.hint {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: #7f8c8d;
+  font-style: italic;
 }
 </style>

@@ -9,6 +9,11 @@ export interface WindowConfig {
 
 export interface EngineConfig {
   pikafish_path: string;
+  threads: number;        // CPU线程数
+  hash: number;           // 哈希表大小(MB)
+  calculation_mode: 'time' | 'depth';  // 计算模式
+  movetime: number;       // 每步思考时间(毫秒)
+  depth: number;          // 搜索深度
 }
 
 export interface UIConfig {
@@ -17,10 +22,20 @@ export interface UIConfig {
   piece_shape: 'cylinder' | 'standard';
 }
 
+// 新建游戏默认配置
+export interface NewGameDefaultConfig {
+  black_use_ai: boolean;
+  red_use_ai: boolean;
+  black_ai_level: number;
+  red_ai_level: number;
+  time_per_move: number;  // 每步用时(秒)
+}
+
 export interface AppConfig {
   window: WindowConfig;
   engine: EngineConfig;
   ui: UIConfig;
+  new_game_defaults: NewGameDefaultConfig;
 }
 
 // 默认配置
@@ -33,11 +48,23 @@ const DEFAULT_CONFIG: AppConfig = {
   },
   engine: {
     pikafish_path: 'public/pikafish/pikafish-vnni512.exe',
+    threads: Math.max(1, Math.floor((typeof navigator !== 'undefined' && navigator.hardwareConcurrency) || 4) / 2),
+    hash: 2048,
+    calculation_mode: 'depth',
+    movetime: 1000,
+    depth: 20,
   },
   ui: {
     board_texture: 'src/assets/textures/tx1/dark_wood_diff_1k.jpg',
     opponent_text_direction: 'down',
     piece_shape: 'cylinder',
+  },
+  new_game_defaults: {
+    black_use_ai: true,
+    red_use_ai: false,
+    black_ai_level: 15,
+    red_ai_level: 15,
+    time_per_move: 30,
   },
 };
 
