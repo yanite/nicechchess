@@ -334,11 +334,21 @@ function openNewGameDialog() {
 function handleNewGame(config: NewGameConfig) {
   console.log('新开局配置:', config);
   
+  // 设置玩家配置
+  chessStore.setPlayers(config.blackPlayer, config.redPlayer);
+  
   // 重置棋盘状态
   chessStore.resetGame();
   
-  // TODO: 根据配置设置玩家信息和AI等级
-  // 目前先显示提示
+  // 如果黑方是AI，延迟触发AI行棋
+  if (config.blackPlayer.useAI) {
+    console.log('黑方使用AI，等级:', config.blackPlayer.aiLevel);
+    setTimeout(() => {
+      // ChessBoard3D组件会自动检测并触发AI
+    }, 1000);
+  }
+  
+  // 显示提示
   alert(`新游戏开始！\n黑方：${config.blackPlayer.name}${config.blackPlayer.useAI ? ' (AI Lv.' + config.blackPlayer.aiLevel + ')' : ''}\n红方：${config.redPlayer.name}${config.redPlayer.useAI ? ' (AI Lv.' + config.redPlayer.aiLevel + ')' : ''}\n每步用时：${config.timePerMove}秒`);
 }
 

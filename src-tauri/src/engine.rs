@@ -79,9 +79,15 @@ pub fn get_best_move(
     state: State<EngineState>,
     fen: String,
     depth: u32,
+    skill_level: Option<u32>,
 ) -> Result<String, String> {
     let mut process_guard = state.process.lock().map_err(|e| format!("锁定失败: {}", e))?;
     if let Some(ref mut child) = *process_guard {
+        // 设置 AI 等级（如果提供）
+        if let Some(level) = skill_level {
+            set_skill_level(child, level)?;
+        }
+        
         // 设置局面
         set_position(child, &fen)?;
         
@@ -220,4 +226,20 @@ fn read_best_move(child: &mut Child) -> Result<String, String> {
         }
     }
     Err("未找到最佳着法".to_string())
+}
+
+/// 设置 AI 等级
+fn set_skill_level(child: &mut Child, level: u32) -> Result<(), String> {
+    println!("设置 AI 等级: {}", level);
+    if let Some(mut stdin) = child.stdin.take() {
+        use std::io::Write;
+        let command = format!("setoption name Skill Level value {}\n", level);
+        stdin.write_all(command.as_bytes()).map_err(|e| format!("发送 setoption 命令失败: {}", e))?;
+        stdin.flush().map_err(|e| format!("刷新缓冲区失败: {}", e))?;
+        child.stdin = Some(stdin);
+        
+        // 等待引擎确认（可选，有些引擎会返回）
+        // 这里不读取响应，直接继续
+    }
+    Ok(())
 }
