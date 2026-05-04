@@ -2,7 +2,7 @@
 import ChessBoard3D from './components/3d/ChessBoard3D.vue';
 import SettingsDialog from './components/SettingsDialog.vue';
 import { useChessStore } from './store/chessStore';
-import { computed, ref, onMounted } from 'vue';
+import { computed, ref, onMounted, onUnmounted } from 'vue';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
 const chessStore = useChessStore();
@@ -76,29 +76,36 @@ onMounted(async () => {
   const appWindow = getCurrentWindow();
   console.log('获取到appWindow对象:', appWindow);
   
+  let unlistenMove: (() => void) | null = null;
+  let unlistenResize: (() => void) | null = null;
+  
   try {
-    const unlistenMove = await appWindow.onMoved((event) => {
+    unlistenMove = await appWindow.onMoved((event) => {
       console.log('窗口移动事件触发:', event.payload);
       saveWindowStateDebounced();
     });
     console.log('窗口移动监听器已注册');
     
-    const unlistenResize = await appWindow.onResized((event) => {
+    unlistenResize = await appWindow.onResized((event) => {
       console.log('窗口调整大小事件触发:', event.payload);
       saveWindowStateDebounced();
     });
     console.log('窗口调整大小监听器已注册');
-    
-    // 在组件卸载时清理事件监听器
-    import { onUnmounted } from 'vue';
-    onUnmounted(() => {
-      unlistenMove();
-      unlistenResize();
-      console.log('窗口监听器已清理');
-    });
   } catch (error) {
     console.error('注册窗口监听器失败:', error);
   }
+  
+  // 在组件卸载时清理事件监听器
+  onUnmounted(() => {
+    if (unlistenMove) {
+      unlistenMove();
+      console.log('窗口移动监听器已清理');
+    }
+    if (unlistenResize) {
+      unlistenResize();
+      console.log('窗口调整大小监听器已清理');
+    }
+  });
 });
 
 // 计算当前行棋方显示文本
