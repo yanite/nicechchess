@@ -41,10 +41,19 @@ pub struct UIConfig {
 }
 
 impl AppConfig {
-    /// 获取配置文件路径（使用可执行程序当前目录）
+    /// 获取配置文件路径（使用系统配置目录）
     fn get_config_path() -> PathBuf {
-        // 直接使用当前工作目录下的 config.yaml
-        PathBuf::from("config.yaml")
+        // 使用系统配置目录，避免在项目目录中保存配置导致Tauri重新编译
+        let config_dir = dirs::config_dir()
+            .expect("无法获取系统配置目录")
+            .join("chchess");
+        
+        // 确保目录存在
+        if !config_dir.exists() {
+            fs::create_dir_all(&config_dir).expect("创建配置目录失败");
+        }
+        
+        config_dir.join("config.yaml")
     }
 
     /// 加载配置
