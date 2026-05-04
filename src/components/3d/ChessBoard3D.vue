@@ -864,10 +864,16 @@ function onMouseDown(event: MouseEvent) {
   
   // 只响应左键
   if (event.button === 0) {
-    const pieceIntersects = raycaster.intersectObjects(piecesGroup.children);
+    // 递归检测所有子对象（包括文字贴图）
+    const pieceIntersects = raycaster.intersectObjects(piecesGroup.children, true);
 
     if (pieceIntersects.length > 0) {
-      const selectedObject = pieceIntersects[0].object as THREE.Mesh;
+      let selectedObject = pieceIntersects[0].object as THREE.Mesh;
+      
+      // 如果点击的是文字贴图（子对象），找到父对象（棋子主体）
+      while (selectedObject.parent && selectedObject.parent !== piecesGroup) {
+        selectedObject = selectedObject.parent as THREE.Mesh;
+      }
       
       // 检查是否是死子（被吃掉的棋子不能再移动）
       if ((selectedObject as any).userData.isCaptured) {
