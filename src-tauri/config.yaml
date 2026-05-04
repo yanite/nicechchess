@@ -1,8 +1,8 @@
 window:
-  x: 1266
-  y: 7
-  width: 1565
-  height: 1353
+  x: 1243
+  y: 3
+  width: 1723
+  height: 1389
 engine:
   pikafish_path: public/pikafish/pikafish-vnni512.exe
 ui:

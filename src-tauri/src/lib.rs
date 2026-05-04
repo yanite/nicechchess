@@ -46,6 +46,34 @@ fn save_window_state(app_handle: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// 扫描纹理目录
+#[tauri::command]
+fn scan_texture_directories() -> Result<Vec<String>, String> {
+    use std::fs;
+    
+    let textures_path = PathBuf::from("src/assets/textures");
+    
+    if !textures_path.exists() {
+        return Ok(vec![]);
+    }
+    
+    let mut textures = vec![];
+    
+    for entry in fs::read_dir(&textures_path).map_err(|e| format!("读取目录失败: {}", e))? {
+        let entry = entry.map_err(|e| format!("读取条目失败: {}", e))?;
+        let path = entry.path();
+        
+        if path.is_dir() {
+            if let Some(dir_name) = path.file_name().and_then(|n| n.to_str()) {
+                textures.push(dir_name.to_string());
+            }
+        }
+    }
+    
+    textures.sort();
+    Ok(textures)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -147,7 +175,8 @@ pub fn run() {
             get_best_move,
             load_config,
             save_config,
-            save_window_state
+            save_window_state,
+            scan_texture_directories
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
