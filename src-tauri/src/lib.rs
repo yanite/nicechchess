@@ -2,7 +2,6 @@
 mod engine;
 
 use engine::{EngineState, start_engine, stop_engine, get_best_move};
-use tauri::Manager;
 use std::path::PathBuf;
 
 #[tauri::command]

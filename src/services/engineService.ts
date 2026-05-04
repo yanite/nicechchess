@@ -2,10 +2,11 @@ import { invoke } from '@tauri-apps/api/core';
 
 /**
  * 启动 Pikafish 引擎
+ * @param enginePath 引擎可执行文件路径
  */
-export async function startEngine(): Promise<string> {
+export async function startEngine(enginePath: string): Promise<string> {
   try {
-    const result = await invoke<string>('start_engine');
+    const result = await invoke<string>('start_engine', { enginePath });
     console.log('引擎启动成功:', result);
     return result;
   } catch (error) {
