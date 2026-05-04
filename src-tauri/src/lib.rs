@@ -72,10 +72,10 @@ pub fn run() {
                 window.on_window_event(move |event| {
                     match event {
                         tauri::WindowEvent::Moved(_) | tauri::WindowEvent::Resized(_) => {
-                            // 延迟保存，避免频繁写入
+                            // 延迟保存，避免频繁写入（增加到2秒）
                             let win = window_clone.clone();
                             std::thread::spawn(move || {
-                                std::thread::sleep(std::time::Duration::from_millis(500));
+                                std::thread::sleep(std::time::Duration::from_millis(2000));
                                 if let Ok(position) = win.outer_position() {
                                     if let Ok(size) = win.outer_size() {
                                         if let Ok(mut config) = AppConfig::load() {
