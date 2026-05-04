@@ -478,7 +478,7 @@ function createPieces() {
       if (piece !== PIECES.EMPTY) {
         const pieceMesh = createPieceMesh(piece, row, col);
         
-        // 设置位置（x和z，y坐标已在createPieceMesh中设置）
+        // 设置位置（x和z，y坐标已在createPieceMesh中设置为 0.01 + height/2）
         pieceMesh.position.x = startX + col * CELL_SIZE;
         pieceMesh.position.z = startZ + row * CELL_SIZE;
         // y坐标由createPieceMesh内部设置为 0.01 + height / 2
@@ -652,7 +652,8 @@ function createPieceMesh(piece: PieceType, _row: number, _col: number): THREE.Me
   });
   const textMesh = new THREE.Mesh(textGeometry, textMaterial);
   textMesh.rotation.x = -Math.PI / 2; // 水平放置
-  textMesh.position.y = height / 2 + 0.001; // 略微高于顶部，避免z-fighting
+  // 文字贴图相对于棋子中心，放在顶部
+  textMesh.position.y = height / 2 + 0.001; // 棋子中心在0，顶部在height/2
   mesh.add(textMesh);
   
   return mesh;
