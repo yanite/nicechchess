@@ -144,3 +144,15 @@ export async function scanTextureDirectories(): Promise<string[]> {
     return ['tx1']; // 降级返回默认值
   }
 }
+
+/**
+ * 获取指定纹理目录下的所有贴图文件
+ */
+export async function getTextureFiles(textureName: string): Promise<string[]> {
+  try {
+    return await invoke('get_texture_files', { textureName });
+  } catch (error) {
+    console.error(`获取纹理文件失败 (${textureName}):`, error);
+    return [];
+  }
+}
