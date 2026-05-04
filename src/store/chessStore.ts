@@ -23,6 +23,13 @@ export interface MoveRecord {
   timestamp: number;       // 时间戳
 }
 
+// 玩家配置接口
+export interface PlayerConfig {
+  name: string;
+  useAI: boolean;
+  aiLevel: number;
+}
+
 // 棋局状态接口
 export interface GameState {
   board: Board;
@@ -34,6 +41,8 @@ export interface GameState {
   winner: 'red' | 'black' | null;  // 获胜方
   redTime: number;  // 红方剩余时间（秒）
   blackTime: number;  // 黑方剩余时间（秒）
+  blackPlayer: PlayerConfig;  // 黑方玩家配置
+  redPlayer: PlayerConfig;    // 红方玩家配置
 }
 
 export const useChessStore = defineStore('chess', () => {
@@ -47,6 +56,18 @@ export const useChessStore = defineStore('chess', () => {
   const winner = ref<'red' | 'black' | null>(null);
   const redTime = ref(600);  // 默认每方 10 分钟
   const blackTime = ref(600);
+  
+  // 玩家配置（默认值）
+  const blackPlayer = ref<PlayerConfig>({
+    name: 'Play1',
+    useAI: true,
+    aiLevel: 15
+  });
+  const redPlayer = ref<PlayerConfig>({
+    name: 'Play2',
+    useAI: false,
+    aiLevel: 15
+  });
 
   // 计算属性：获取 FEN 串
   const fen = computed(() => {
@@ -187,6 +208,31 @@ export const useChessStore = defineStore('chess', () => {
   }
 
   /**
+   * 设置玩家配置
+   */
+  function setPlayers(black: PlayerConfig, red: PlayerConfig) {
+    blackPlayer.value = { ...black };
+    redPlayer.value = { ...red };
+    console.log('玩家配置已更新:', { black, red });
+  }
+
+  /**
+   * 获取当前玩家的 AI 等级
+   */
+  function getCurrentPlayerAILevel(): number | undefined {
+    const player = currentPlayer.value === 'black' ? blackPlayer.value : redPlayer.value;
+    return player.useAI ? player.aiLevel : undefined;
+  }
+
+  /**
+   * 检查当前玩家是否使用 AI
+   */
+  function isCurrentPlayerAI(): boolean {
+    const player = currentPlayer.value === 'black' ? blackPlayer.value : redPlayer.value;
+    return player.useAI;
+  }
+
+  /**
    * 重置游戏
    */
   function resetGame() {
@@ -296,6 +342,8 @@ export const useChessStore = defineStore('chess', () => {
     winner,
     redTime,
     blackTime,
+    blackPlayer,
+    redPlayer,
     
     // 计算属性
     fen,
@@ -310,5 +358,8 @@ export const useChessStore = defineStore('chess', () => {
     resetGame,
     generateFEN,
     loadFromFEN,
+    setPlayers,
+    getCurrentPlayerAILevel,
+    isCurrentPlayerAI,
   };
 });

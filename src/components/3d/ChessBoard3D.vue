@@ -1140,13 +1140,15 @@ function executeMove(fromRow: number, fromCol: number, toRow: number, toCol: num
   // 5. 检查是否形成将军或绝杀
   checkCheckAndCheckmate(toRow, toCol);
   
-  // 6. 如果轮到黑方（AI），触发 AI 行棋
+  // 6. 如果当前玩家是 AI，触发 AI 行棋（支持双 AI）
   console.log('移动完成，当前玩家:', chessStore.currentPlayer);
-  if (chessStore.currentPlayer === 'black') {
-    console.log('检测到轮到黑方，准备触发 AI...');
-    triggerAIMove();
+  if (chessStore.isCurrentPlayerAI()) {
+    console.log('检测到当前玩家是AI，准备触发 AI...');
+    setTimeout(() => {
+      triggerAIMove();
+    }, 1000);
   } else {
-    console.log('当前是红方，不触发 AI');
+    console.log('当前是人类玩家，等待操作');
   }
 }
 
@@ -1249,7 +1251,12 @@ async function triggerAIMove() {
     
     // 请求 AI 最佳着法（搜索深度 15）
     console.log('调用 getBestMove...');
-    const bestMoveUCI = await getBestMove(fen, 15);
+    
+    // 获取当前玩家的 AI 等级
+    const skillLevel = chessStore.getCurrentPlayerAILevel();
+    console.log('当前玩家 AI 等级:', skillLevel);
+    
+    const bestMoveUCI = await getBestMove(fen, 15, skillLevel);
     
     console.log('AI 选择着法:', bestMoveUCI);
     console.log('着法长度:', bestMoveUCI.length);
@@ -1380,6 +1387,14 @@ function executeAIMove(fromRow: number, fromCol: number, toRow: number, toCol: n
     chessStore.movePiece(fromRow, fromCol, toRow, toCol);
     // 检查将军/绝杀
     checkCheckAndCheckmate(toRow, toCol);
+    
+    // 检查下一位玩家是否是 AI（支持双 AI 对战）
+    setTimeout(() => {
+      if (chessStore.isCurrentPlayerAI()) {
+        console.log('检测到下一位玩家也是AI，触发连续AI对战');
+        triggerAIMove();
+      }
+    }, 600);
   }, 500);
 }
 
