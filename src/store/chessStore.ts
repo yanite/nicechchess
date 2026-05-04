@@ -28,6 +28,7 @@ export interface GameState {
   board: Board;
   currentPlayer: 'red' | 'black';  // 当前行棋方
   moveHistory: MoveRecord[];       // 着法历史
+  currentMoveIndex: number;        // 当前着法索引（用于redo支持）
   selectedPiece: [number, number] | null;  // 当前选中的棋子
   gameStatus: 'playing' | 'paused' | 'finished';  // 游戏状态
   winner: 'red' | 'black' | null;  // 获胜方
@@ -40,6 +41,7 @@ export const useChessStore = defineStore('chess', () => {
   const board = ref<Board>(initBoard());
   const currentPlayer = ref<'red' | 'black'>('red');
   const moveHistory = ref<MoveRecord[]>([]);
+  const currentMoveIndex = ref<number>(-1);  // -1表示初始状态
   const selectedPiece = ref<[number, number] | null>(null);
   const gameStatus = ref<'playing' | 'paused' | 'finished'>('playing');
   const winner = ref<'red' | 'black' | null>(null);
@@ -53,7 +55,12 @@ export const useChessStore = defineStore('chess', () => {
 
   // 计算属性：是否可以悔棋
   const canUndo = computed(() => {
-    return moveHistory.value.length > 0;
+    return currentMoveIndex.value >= 0;
+  });
+
+  // 计算属性：是否可以重做
+  const canRedo = computed(() => {
+    return currentMoveIndex.value < moveHistory.value.length - 1;
   });
 
   /**
@@ -107,7 +114,14 @@ export const useChessStore = defineStore('chess', () => {
       chineseNotation,
       timestamp: Date.now(),
     };
+    
+    // 如果在历史记录中间位置移动新棋，删除后续所有记录
+    if (currentMoveIndex.value < moveHistory.value.length - 1) {
+      moveHistory.value = moveHistory.value.slice(0, currentMoveIndex.value + 1);
+    }
+    
     moveHistory.value.push(moveRecord);
+    currentMoveIndex.value = moveHistory.value.length - 1;
     
     // 切换行棋方
     currentPlayer.value = currentPlayer.value === 'red' ? 'black' : 'red';
@@ -119,14 +133,15 @@ export const useChessStore = defineStore('chess', () => {
   }
 
   /**
-   * 悔棋
+   * 悔棋（撤销上一步）
    */
   function undoMove(): boolean {
-    if (moveHistory.value.length === 0) {
+    if (currentMoveIndex.value < 0) {
+      console.log('无法悔棋：已回到初始状态');
       return false;
     }
     
-    const lastMove = moveHistory.value.pop();
+    const lastMove = moveHistory.value[currentMoveIndex.value];
     if (!lastMove) return false;
     
     // 恢复棋盘状态
@@ -137,6 +152,37 @@ export const useChessStore = defineStore('chess', () => {
     // 切换回上一个行棋方
     currentPlayer.value = currentPlayer.value === 'red' ? 'black' : 'red';
     
+    // 移动索引减1
+    currentMoveIndex.value--;
+    
+    console.log('悔棋成功，当前索引:', currentMoveIndex.value);
+    return true;
+  }
+
+  /**
+   * 重做（恢复下一步）
+   */
+  function redoMove(): boolean {
+    if (currentMoveIndex.value >= moveHistory.value.length - 1) {
+      console.log('无法重做：已在最新状态');
+      return false;
+    }
+    
+    // 移动到下一个索引
+    currentMoveIndex.value++;
+    const nextMove = moveHistory.value[currentMoveIndex.value];
+    
+    if (!nextMove) return false;
+    
+    // 应用着法
+    const { from, to, piece, captured } = nextMove;
+    board.value[from[0]][from[1]] = PIECES.EMPTY;
+    board.value[to[0]][to[1]] = piece;
+    
+    // 切换行棋方
+    currentPlayer.value = currentPlayer.value === 'red' ? 'black' : 'red';
+    
+    console.log('重做成功，当前索引:', currentMoveIndex.value);
     return true;
   }
 
@@ -147,6 +193,7 @@ export const useChessStore = defineStore('chess', () => {
     board.value = initBoard();
     currentPlayer.value = 'red';
     moveHistory.value = [];
+    currentMoveIndex.value = -1;  // 重置索引
     selectedPiece.value = null;
     gameStatus.value = 'playing';
     winner.value = null;
@@ -243,6 +290,7 @@ export const useChessStore = defineStore('chess', () => {
     board,
     currentPlayer,
     moveHistory,
+    currentMoveIndex,
     selectedPiece,
     gameStatus,
     winner,
@@ -252,11 +300,13 @@ export const useChessStore = defineStore('chess', () => {
     // 计算属性
     fen,
     canUndo,
+    canRedo,
     
     // 方法
     selectPiece,
     movePiece,
     undoMove,
+    redoMove,
     resetGame,
     generateFEN,
     loadFromFEN,
