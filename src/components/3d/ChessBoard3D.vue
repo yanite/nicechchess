@@ -98,6 +98,13 @@ async function initScene() {
   controls.enableDamping = true;
   controls.dampingFactor = 0.05;
   controls.enabled = false; // 默认禁用旋转
+  
+  // 配置鼠标按钮：左键用于拖动棋子，右键用于旋转视角
+  controls.mouseButtons = {
+    LEFT: null,        // 左键不用于旋转（留给棋子拖动）
+    MIDDLE: THREE.MOUSE.DOLLY,  // 中键缩放
+    RIGHT: THREE.MOUSE.ROTATE   // 右键旋转
+  };
 
   // 添加灯光
   setupLights();
@@ -652,52 +659,54 @@ function onMouseDown(event: MouseEvent) {
   // 射线检测
   raycaster.setFromCamera(mouse, camera);
   
-  // 首先检测是否点击到棋子
-  const pieceIntersects = raycaster.intersectObjects(piecesGroup.children);
+  // 首先检测是否点击到棋子（只响应左键）
+  if (event.button === 0) {  // 左键
+    const pieceIntersects = raycaster.intersectObjects(piecesGroup.children);
 
-  if (pieceIntersects.length > 0) {
-    const selectedObject = pieceIntersects[0].object as THREE.Mesh;
-    
-    // 检查是否是死子（被吃掉的棋子不能再移动）
-    if ((selectedObject as any).userData.isCaptured) {
-      return; // 死子不能拖动
+    if (pieceIntersects.length > 0) {
+      const selectedObject = pieceIntersects[0].object as THREE.Mesh;
+      
+      // 检查是否是死子（被吃掉的棋子不能再移动）
+      if ((selectedObject as any).userData.isCaptured) {
+        return; // 死子不能拖动
+      }
+      
+      // 检查是否是当前行棋方的棋子
+      const { row, col, piece } = (selectedObject as any).userData;
+      const pieceColor = piece > 0 ? 'red' : 'black';
+      
+      if (pieceColor === chessStore.currentPlayer) {
+        // 开始拖动
+        draggedPiece = selectedObject;
+        isDragging = true;
+        
+        // 计算拖动偏移量（保持棋子与鼠标的相对位置）
+        const planeY = 0.5; // 拖动平面高度
+        const intersectPoint = new THREE.Vector3();
+        const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -planeY);
+        raycaster.ray.intersectPlane(plane, intersectPoint);
+        
+        dragOffset.copy(selectedObject.position).sub(intersectPoint);
+        
+        // 抬起棋子
+        selectedObject.position.y = 0.8;
+        
+        // 禁用旋转控制器，避免冲突
+        controls.enabled = false;
+        return;
+      }
     }
     
-    // 检查是否是当前行棋方的棋子
-    const { row, col, piece } = (selectedObject as any).userData;
-    const pieceColor = piece > 0 ? 'red' : 'black';
+    // 如果左键没有点击到棋子，检测是否点击到棋盘
+    const boardIntersects = raycaster.intersectObjects(boardGroup.children);
     
-    if (pieceColor === chessStore.currentPlayer) {
-      // 开始拖动
-      draggedPiece = selectedObject;
-      isDragging = true;
-      
-      // 计算拖动偏移量（保持棋子与鼠标的相对位置）
-      const planeY = 0.5; // 拖动平面高度
-      const intersectPoint = new THREE.Vector3();
-      const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -planeY);
-      raycaster.ray.intersectPlane(plane, intersectPoint);
-      
-      dragOffset.copy(selectedObject.position).sub(intersectPoint);
-      
-      // 抬起棋子
-      selectedObject.position.y = 0.8;
-      
-      // 禁用旋转控制器，避免冲突
+    if (boardIntersects.length > 0) {
+      // 点击到棋盘，禁用旋转
       controls.enabled = false;
-      return;
+    } else {
+      // 点击到棋盘外面，启用旋转摄像头
+      controls.enabled = true;
     }
-  }
-  
-  // 如果没有点击到棋子，检测是否点击到棋盘
-  const boardIntersects = raycaster.intersectObjects(boardGroup.children);
-  
-  if (boardIntersects.length > 0) {
-    // 点击到棋盘，禁用旋转
-    controls.enabled = false;
-  } else {
-    // 点击到棋盘外面，启用旋转摄像头
-    controls.enabled = true;
   }
 }
 
