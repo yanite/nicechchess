@@ -1435,13 +1435,24 @@ function displayCheckmateAlert() {
  * 重置棋子位置到原位
  */
 function resetPiecePosition(pieceMesh: THREE.Mesh) {
-  const { row, col } = (pieceMesh as any).userData;
+  const { row, col, piece } = (pieceMesh as any).userData;
   const startX = -((BOARD_WIDTH - 1) * CELL_SIZE) / 2;
   const startZ = -((BOARD_HEIGHT - 1) * CELL_SIZE) / 2;
   
   pieceMesh.position.x = startX + col * CELL_SIZE;
   pieceMesh.position.z = startZ + row * CELL_SIZE;
-  // 不要设置y坐标，保持createPieceMesh中设置的正确高度
+  
+  // 恢复正确的y坐标：根据棋子形状重新计算
+  const fullHeight = CELL_SIZE * 0.35;
+  const height = currentPieceShape === 'cylinder' ? fullHeight * 0.5 : fullHeight;
+  
+  if (currentPieceShape === 'cylinder') {
+    // 柱型：圆柱几何体中心在原点，要让底部在 y=0.01，需要上移 height/2
+    pieceMesh.position.y = 0.01 + height / 2;
+  } else {
+    // 鼓型：LatheGeometry 从 y=0 开始，直接放在棋盘上
+    pieceMesh.position.y = 0.01;
+  }
 }
 
 /**
