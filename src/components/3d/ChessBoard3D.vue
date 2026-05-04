@@ -150,12 +150,12 @@ async function initScene() {
  * 设置灯光
  */
 function setupLights() {
-  // 环境光
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+  // 环境光（增强亮度）
+  const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
   scene.add(ambientLight);
 
-  // 方向光（主光源）
-  const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+  // 方向光（主光源，增强亮度）
+  const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
   directionalLight.position.set(10, 20, 10);
   directionalLight.castShadow = true;
   directionalLight.shadow.camera.near = 0.1;
@@ -1648,11 +1648,20 @@ const checkConfigChange = setInterval(() => {
   const currentConfig = localStorage.getItem('chchess_config') || '';
   if (currentConfig !== lastConfig && lastConfig !== '') {
     lastConfig = currentConfig;
-    console.log('检测到配置变化，重新加载棋子形状');
+    console.log('检测到配置变化');
     try {
       const config = JSON.parse(currentConfig);
+      
+      // 检查棋子形状变化
       if (config.ui && config.ui.piece_shape && config.ui.piece_shape !== currentPieceShape) {
+        console.log('重新加载棋子形状');
         updatePieceShape(config.ui.piece_shape);
+      }
+      
+      // 检查棋盘纹理变化
+      if (config.ui && config.ui.board_texture) {
+        console.log('检测到棋盘纹理变化:', config.ui.board_texture);
+        reloadBoardTexture(config.ui.board_texture);
       }
     } catch (error) {
       console.error('解析配置失败:', error);
@@ -1669,14 +1678,41 @@ onBeforeUnmount(() => {
   clearInterval(checkConfigChange);
 });
 
+// 重新加载棋盘纹理
+function reloadBoardTexture(newTexturePath: string) {
+  console.log('重新加载棋盘纹理:', newTexturePath);
+  
+  if (!boardGroup || !scene) {
+    console.warn('棋盘组或场景未初始化');
+    return;
+  }
+  
+  // 移除旧的棋盘
+  scene.remove(boardGroup);
+  
+  // 创建新的棋盘
+  createBoard(newTexturePath);
+  
+  console.log('棋盘纹理已更新');
+}
+
 // 监听localStorage变化（配置变更）
 const handleStorageChange = (e: StorageEvent) => {
   if (e.key === 'chchess_config') {
-    console.log('检测到配置变化，重新加载棋子形状');
+    console.log('检测到配置变化');
     try {
       const config = JSON.parse(e.newValue || '{}');
-      if (config.ui && config.ui.piece_shape) {
+      
+      // 检查棋子形状变化
+      if (config.ui && config.ui.piece_shape && config.ui.piece_shape !== currentPieceShape) {
+        console.log('重新加载棋子形状');
         updatePieceShape(config.ui.piece_shape);
+      }
+      
+      // 检查棋盘纹理变化
+      if (config.ui && config.ui.board_texture) {
+        console.log('检测到棋盘纹理变化:', config.ui.board_texture);
+        reloadBoardTexture(config.ui.board_texture);
       }
     } catch (error) {
       console.error('解析配置失败:', error);
