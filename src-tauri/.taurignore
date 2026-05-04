@@ -1,0 +1,4 @@
+# 忽略 src-tauri 下的 config.yaml
+config.yaml
+# 如果是某个子目录下的
+**/temp_config/*.yaml
