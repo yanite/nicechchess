@@ -23,6 +23,7 @@
 | 13 | 棋子字体漂浮和方向错误 | 🟡 中等 | ✅ 已修复 |
 | 14 | 柱型棋子嵌入棋盘及点击命中问题 | 🟡 中等 | ✅ 已修复 |
 | 15 | 棋子移动后重新嵌入棋盘 | 🟡 中等 | ✅ 已修复 |
+| 16 | 被吃掉的棋子不显示 | 🟡 中等 | ✅ 已修复 |
 
 ---
 
@@ -759,7 +760,102 @@ pieceMesh.position.z = startZ + row * CELL_SIZE;
 3. 多次移动棋子，确认不会出现嵌入问题
 4. 测试吃掉棋子的场景，确认被吃棋子位置正确
 
-**相关提交：** （待提交）
+**相关提交：** `82eda65`
+
+---
+
+### **Bug #16: 被吃掉的棋子不显示**
+
+**发现时间：** 2026-05-04（紧接 Bug #15 之后）  
+**影响范围：** `src/components/3d/ChessBoard3D.vue`  
+**现象：**
+- 修复 Bug #15 后，棋子高度和位置都正确
+- 但吃掉对方棋子后，被吃掉的棋子从场景中消失
+
+**根本原因：**
+[syncPiecesWithBoard](file://v:\4_mydoc\tauri\nicechchess\src\components\3d\ChessBoard3D.vue#L776-L875) 函数在每次落子后被调用，其原有逻辑是：
+1. **清空所有棋子**（包括被吃掉的棋子）
+2. **只根据 board 数组重新创建棋子**
+
+而被吃掉的棋子已经从 board 数组中移除（标记为 [PIECES.EMPTY](file://v:\4_mydoc\tauri\nicechchess\src\logic\chess\constants.ts#L30-L30)），所以不会被重新创建。
+
+这违反了**棋子永不消失原则**：所有棋子在任何情况下都不应该从场景中消失！
+
+**修复方案：**
+
+修改 [syncPiecesWithBoard](file://v:\4_mydoc\tauri\nicechchess\src\components\3d\ChessBoard3D.vue#L776-L875) 函数的策略：**保留被吃掉的棋子，只更新棋盘上的棋子**。
+
+``typescript
+// 修复前（错误）❌
+// 第一步：移除所有现有棋子
+while(piecesGroup.children.length > 0) {
+  const child = piecesGroup.children[0];
+  piecesGroup.remove(child);
+  // ... 释放资源 ...
+}
+
+// 第二步：根据board重新创建所有棋子
+for (let row = 0; row < BOARD_HEIGHT; row++) {
+  for (let col = 0; col < BOARD_WIDTH; col++) {
+    const piece = board[row][col];
+    if (piece !== PIECES.EMPTY) {
+      // 创建棋子...
+    }
+  }
+}
+// 被吃掉的棋子因为不在board中，所以消失了！
+
+// 修复后（正确）✅
+// 第一步：收集并保留被吃掉的棋子
+const capturedPieces: THREE.Mesh[] = [];
+piecesGroup.children.forEach(child => {
+  if (child instanceof THREE.Mesh) {
+    const userData = child.userData as any;
+    if (userData.isCaptured) {
+      capturedPieces.push(child); // 保留被吃掉的棋子
+    }
+  }
+});
+
+// 第二步：只移除棋盘上的活子
+piecesToRemove.forEach(piece => {
+  piecesGroup.remove(piece);
+  // ... 释放资源 ...
+});
+
+// 第三步：重建棋盘上的棋子
+for (let row = 0; row < BOARD_HEIGHT; row++) {
+  for (let col = 0; col < BOARD_WIDTH; col++) {
+    const piece = board[row][col];
+    if (piece !== PIECES.EMPTY) {
+      // 创建棋子...
+    }
+  }
+}
+
+// 第四步：将被吃掉的棋子重新添加回场景
+capturedPieces.forEach(capturedPiece => {
+  piecesGroup.add(capturedPiece);
+});
+```
+
+**关键改进：**
+1. **分离保留策略**：先收集被吃掉的棋子，避免被清除
+2. **选择性清理**：只移除棋盘上的活子（`isCaptured === false`）
+3. **恢复机制**：重建完成后，将被吃棋子重新添加到场景
+4. **y坐标保持**：被吃棋子保持在正确高度（y=0.01）
+
+**验证方法：**
+1. 启动应用，进行正常对局
+2. 用己方棋子吃掉对方棋子
+3. 观察被吃掉的棋子是否移动到棋盘边缘并保持可见
+4. 继续对局，多次吃子，确认所有被吃棋子都保持可见
+5. 检查被吃棋子是否在棋盘边缘整齐排列
+
+**相关规范：**
+此Bug的修复促使我们建立了**棋子永不消失原则**，已添加到 [`docs/PROJECT_RULES.md`](v:\4_mydoc\tauri\nicechchess\docs\PROJECT_RULES.md) 中作为强制性规范。
+
+**相关提交：** `ccb9444`
 
 ---
 
@@ -769,6 +865,7 @@ pieceMesh.position.z = startZ + row * CELL_SIZE;
 - [Pikafish 官方文档](http://pikafish.com)
 - [中国象棋 FEN 格式说明](https://www.xiangqiai.com)
 - [Three.js Raycaster 文档](https://threejs.org/docs/#api/en/core/Raycaster)
+- [Three.js Scene Graph 文档](https://threejs.org/docs/#manual/en/introduction/Scenegraph)
 
 ---
 
