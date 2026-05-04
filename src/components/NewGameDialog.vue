@@ -17,28 +17,33 @@
               v-model="blackPlayer.name" 
               placeholder="请输入玩家名称"
               maxlength="20"
+              class="custom-input"
             />
           </div>
           
           <div class="form-group checkbox-group">
-            <label class="checkbox-label">
-              <input 
-                type="checkbox" 
-                v-model="blackPlayer.useAI"
-              />
-              使用AI
-            </label>
+            <div 
+              class="custom-checkbox" 
+              :class="{ checked: blackPlayer.useAI }"
+              @click="toggleBlackAI"
+            >
+              <span class="checkbox-indicator"></span>
+              <span class="checkbox-label">使用AI</span>
+            </div>
             
             <div v-if="blackPlayer.useAI" class="ai-level-group">
               <label>AI等级：</label>
-              <input 
-                type="range" 
-                v-model.number="blackPlayer.aiLevel" 
-                min="0" 
-                max="20" 
-                step="1"
-              />
-              <span class="level-value">{{ blackPlayer.aiLevel }}</span>
+              <div class="slider-wrapper">
+                <input 
+                  type="range" 
+                  v-model.number="blackPlayer.aiLevel" 
+                  min="0" 
+                  max="20" 
+                  step="1"
+                  class="custom-slider"
+                />
+                <span class="level-value">{{ blackPlayer.aiLevel }}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -56,28 +61,33 @@
               v-model="redPlayer.name" 
               placeholder="请输入玩家名称"
               maxlength="20"
+              class="custom-input"
             />
           </div>
           
           <div class="form-group checkbox-group">
-            <label class="checkbox-label">
-              <input 
-                type="checkbox" 
-                v-model="redPlayer.useAI"
-              />
-              使用AI
-            </label>
+            <div 
+              class="custom-checkbox" 
+              :class="{ checked: redPlayer.useAI }"
+              @click="toggleRedAI"
+            >
+              <span class="checkbox-indicator"></span>
+              <span class="checkbox-label">使用AI</span>
+            </div>
             
             <div v-if="redPlayer.useAI" class="ai-level-group">
               <label>AI等级：</label>
-              <input 
-                type="range" 
-                v-model.number="redPlayer.aiLevel" 
-                min="0" 
-                max="20" 
-                step="1"
-              />
-              <span class="level-value">{{ redPlayer.aiLevel }}</span>
+              <div class="slider-wrapper">
+                <input 
+                  type="range" 
+                  v-model.number="redPlayer.aiLevel" 
+                  min="0" 
+                  max="20" 
+                  step="1"
+                  class="custom-slider"
+                />
+                <span class="level-value">{{ redPlayer.aiLevel }}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -90,13 +100,18 @@
           <h3>时间设置</h3>
           <div class="form-group">
             <label>每步棋用时（秒）：</label>
-            <input 
-              type="number" 
-              v-model.number="timePerMove" 
-              min="1" 
-              max="300"
-              placeholder="请输入秒数"
-            />
+            <div class="number-input-wrapper">
+              <button class="number-btn minus" @click="decrementTime">-</button>
+              <input 
+                type="number" 
+                v-model.number="timePerMove" 
+                min="1" 
+                max="300"
+                placeholder="请输入秒数"
+                class="custom-number-input"
+              />
+              <button class="number-btn plus" @click="incrementTime">+</button>
+            </div>
           </div>
         </div>
       </div>
@@ -111,6 +126,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue';
+import { loadConfig, saveConfig } from '../services/configService';
 
 // 玩家配置接口
 interface PlayerConfig {
@@ -164,7 +180,7 @@ function close() {
 /**
  * 确认并开始游戏
  */
-function confirm() {
+async function confirm() {
   // 验证输入
   if (!blackPlayer.value.name.trim()) {
     alert('请输入黑棋玩家名称');
@@ -187,31 +203,103 @@ function confirm() {
     timePerMove: timePerMove.value
   };
   
+  // 保存当前设置为下次使用的默认值
+  try {
+    const currentConfig = await loadConfig();
+    currentConfig.new_game_defaults = {
+      black_use_ai: blackPlayer.value.useAI,
+      red_use_ai: redPlayer.value.useAI,
+      black_ai_level: blackPlayer.value.aiLevel,
+      red_ai_level: redPlayer.value.aiLevel,
+      time_per_move: timePerMove.value
+    };
+    await saveConfig(currentConfig);
+    console.log('已保存新游戏默认配置到config.yaml');
+  } catch (error) {
+    console.error('保存配置失败:', error);
+  }
+  
   emit('confirm', config);
   close();
 }
 
 /**
- * 监听对话框显示状态，重置表单
+ * 监听对话框显示状态，从config.yaml加载默认值
  */
-watch(() => props.visible, (newVal) => {
+watch(() => props.visible, async (newVal) => {
   if (newVal) {
-    // 对话框打开时重置为默认值
-    blackPlayer.value = {
-      name: 'Play1',
-      useAI: true,
-      aiLevel: 15
-    };
-    
-    redPlayer.value = {
-      name: 'Play2',
-      useAI: false,
-      aiLevel: 15
-    };
-    
-    timePerMove.value = 30;
+    try {
+      // 从config.yaml加载配置
+      const config = await loadConfig();
+      
+      // 使用保存的默认值
+      blackPlayer.value = {
+        name: 'Play1',
+        useAI: config.new_game_defaults.black_use_ai,
+        aiLevel: config.new_game_defaults.black_ai_level
+      };
+      
+      redPlayer.value = {
+        name: 'Play2',
+        useAI: config.new_game_defaults.red_use_ai,
+        aiLevel: config.new_game_defaults.red_ai_level
+      };
+      
+      timePerMove.value = config.new_game_defaults.time_per_move;
+      
+      console.log('已从config.yaml加载新游戏默认配置');
+    } catch (error) {
+      console.error('加载配置失败，使用硬编码默认值:', error);
+      // 降级到硬编码默认值
+      blackPlayer.value = {
+        name: 'Play1',
+        useAI: true,
+        aiLevel: 15
+      };
+      
+      redPlayer.value = {
+        name: 'Play2',
+        useAI: false,
+        aiLevel: 15
+      };
+      
+      timePerMove.value = 30;
+    }
   }
 });
+
+/**
+ * 切换黑方AI
+ */
+function toggleBlackAI() {
+  blackPlayer.value.useAI = !blackPlayer.value.useAI;
+}
+
+/**
+ * 切换红方AI
+ */
+function toggleRedAI() {
+  redPlayer.value.useAI = !redPlayer.value.useAI;
+}
+
+/**
+ * 增加时间
+ */
+function incrementTime() {
+  if (timePerMove.value < 300) {
+    timePerMove.value++;
+  }
+}
+
+/**
+ * 减少时间
+ */
+function decrementTime() {
+  if (timePerMove.value > 1) {
+    timePerMove.value--;
+  }
+}
+
 </script>
 
 <style scoped>
@@ -440,4 +528,139 @@ watch(() => props.visible, (newVal) => {
 .new-game-dialog::-webkit-scrollbar-thumb:hover {
   background: #a0a0a0;
 }
-</style>
+
+/* 自定义输入框样式 */
+.custom-input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #d0d0d0;
+  border-radius: 4px;
+  background: white;
+  color: #333;
+  font-size: 14px;
+}
+
+.custom-input:focus {
+  outline: none;
+  border-color: #4a90e2;
+}
+
+/* 自定义复选框样式 */
+.custom-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  color: #555;
+  font-size: 14px;
+}
+
+.custom-checkbox .checkbox-indicator {
+  width: 16px;
+  height: 16px;
+  background: white;
+  border: 1px solid #d0d0d0;
+  border-radius: 4px;
+  position: relative;
+}
+
+.custom-checkbox .checkbox-indicator::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  width: 6px;
+  height: 12px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+  opacity: 0;
+}
+
+.custom-checkbox.checked .checkbox-indicator {
+  background: #4a90e2;
+  border-color: #4a90e2;
+}
+
+.custom-checkbox.checked .checkbox-indicator::after {
+  opacity: 1;
+}
+
+/* 滑块包装器 */
+.slider-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: 22px;
+  padding: 8px;
+  background: #f5f5f5;
+  border-radius: 4px;
+}
+
+/* 自定义滑块样式 */
+.custom-slider {
+  flex: 1;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: #d0d0d0;
+  border-radius: 2px;
+  outline: none;
+}
+
+.custom-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: #4a90e2;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+/* 自定义数字输入框样式 */
+.number-input-wrapper {
+  display: flex;
+  align-items: center;
+}
+
+.number-input-wrapper .number-btn {
+  width: 32px;
+  height: 32px;
+  background: #f0f0f0;
+  border: 1px solid #d0d0d0;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.number-input-wrapper .number-btn:hover {
+  background: #e0e0e0;
+}
+
+.number-input-wrapper .number-btn.minus {
+  margin-right: 4px;
+}
+
+.number-input-wrapper .number-btn.plus {
+  margin-left: 4px;
+}
+
+.number-input-wrapper .custom-number-input {
+  width: 60px;
+  padding: 8px 10px;
+  border: 1px solid #d0d0d0;
+  border-radius: 4px;
+  background: white;
+  color: #333;
+  font-size: 14px;
+  text-align: center;
+}
+
+.number-input-wrapper .custom-number-input:focus {
+  outline: none;
+  border-color: #4a90e2;
+}
