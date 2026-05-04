@@ -80,9 +80,23 @@ pub fn get_best_move(
     fen: String,
     depth: u32,
     skill_level: Option<u32>,
+    threads: Option<u32>,
+    hash: Option<u32>,
+    calculation_mode: Option<String>,  // "time" or "depth"
+    movetime: Option<u32>,
 ) -> Result<String, String> {
     let mut process_guard = state.process.lock().map_err(|e| format!("锁定失败: {}", e))?;
     if let Some(ref mut child) = *process_guard {
+        // 设置线程数（如果提供）
+        if let Some(t) = threads {
+            set_option(child, "Threads", t)?;
+        }
+        
+        // 设置哈希表大小（如果提供）
+        if let Some(h) = hash {
+            set_option(child, "Hash", h)?;
+        }
+        
         // 设置 AI 等级（如果提供）
         if let Some(level) = skill_level {
             set_skill_level(child, level)?;
@@ -91,8 +105,14 @@ pub fn get_best_move(
         // 设置局面
         set_position(child, &fen)?;
         
-        // 开始思考
-        go_think(child, depth)?;
+        // 开始思考（根据模式选择）
+        let mode = calculation_mode.unwrap_or_else(|| "depth".to_string());
+        if mode == "time" {
+            let time = movetime.unwrap_or(1000);
+            go_think_time(child, time)?;
+        } else {
+            go_think_depth(child, depth)?;
+        }
         
         // 读取最佳着法
         let best_move = read_best_move(child)?;
@@ -181,10 +201,22 @@ fn set_position(child: &mut Child, fen: &str) -> Result<(), String> {
 }
 
 /// 开始思考
-fn go_think(child: &mut Child, depth: u32) -> Result<(), String> {
+fn go_think_depth(child: &mut Child, depth: u32) -> Result<(), String> {
     if let Some(mut stdin) = child.stdin.take() {
         use std::io::Write;
         let command = format!("go depth {}\n", depth);
+        stdin.write_all(command.as_bytes()).map_err(|e| format!("发送 go 命令失败: {}", e))?;
+        stdin.flush().map_err(|e| format!("刷新缓冲区失败: {}", e))?;
+        child.stdin = Some(stdin);
+    }
+    Ok(())
+}
+
+/// 开始思考（时间模式）
+fn go_think_time(child: &mut Child, time: u32) -> Result<(), String> {
+    if let Some(mut stdin) = child.stdin.take() {
+        use std::io::Write;
+        let command = format!("go movetime {}\n", time);
         stdin.write_all(command.as_bytes()).map_err(|e| format!("发送 go 命令失败: {}", e))?;
         stdin.flush().map_err(|e| format!("刷新缓冲区失败: {}", e))?;
         child.stdin = Some(stdin);
@@ -237,9 +269,19 @@ fn set_skill_level(child: &mut Child, level: u32) -> Result<(), String> {
         stdin.write_all(command.as_bytes()).map_err(|e| format!("发送 setoption 命令失败: {}", e))?;
         stdin.flush().map_err(|e| format!("刷新缓冲区失败: {}", e))?;
         child.stdin = Some(stdin);
-        
-        // 等待引擎确认（可选，有些引擎会返回）
-        // 这里不读取响应，直接继续
+    }
+    Ok(())
+}
+
+/// 通用 setoption 设置函数
+fn set_option(child: &mut Child, name: &str, value: u32) -> Result<(), String> {
+    println!("设置选项: {} = {}", name, value);
+    if let Some(mut stdin) = child.stdin.take() {
+        use std::io::Write;
+        let command = format!("setoption name {} value {}\n", name, value);
+        stdin.write_all(command.as_bytes()).map_err(|e| format!("发送 setoption 命令失败: {}", e))?;
+        stdin.flush().map_err(|e| format!("刷新缓冲区失败: {}", e))?;
+        child.stdin = Some(stdin);
     }
     Ok(())
 }

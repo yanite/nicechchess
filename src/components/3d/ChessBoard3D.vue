@@ -1249,14 +1249,26 @@ async function triggerAIMove() {
       console.log(`  board[${r}]: ${rowPieces}`);
     }
     
-    // 请求 AI 最佳着法（搜索深度 15）
+    // 请求 AI 最佳着法
     console.log('调用 getBestMove...');
     
     // 获取当前玩家的 AI 等级
     const skillLevel = chessStore.getCurrentPlayerAILevel();
     console.log('当前玩家 AI 等级:', skillLevel);
     
-    const bestMoveUCI = await getBestMove(fen, 15, skillLevel);
+    // 获取引擎配置
+    const config = chessStore.engineConfig;
+    console.log('引擎配置:', config);
+    
+    const bestMoveUCI = await getBestMove(
+      fen, 
+      config.depth,           // 深度
+      skillLevel,             // AI等级
+      config.threads,         // 线程数
+      config.hash,            // Hash大小
+      config.calculationMode, // 计算模式
+      config.movetime         // 思考时间
+    );
     
     console.log('AI 选择着法:', bestMoveUCI);
     console.log('着法长度:', bestMoveUCI.length);

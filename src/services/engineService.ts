@@ -32,17 +32,33 @@ export async function stopEngine(): Promise<string> {
 /**
  * 获取 AI 最佳着法
  * @param fen FEN 串表示当前局面
- * @param depth 搜索深度（默认 10）
+ * @param depth 搜索深度（默认 20）
  * @param skillLevel AI 等级（0-20，可选）
+ * @param threads CPU线程数（可选）
+ * @param hash 哈希表大小MB（可选）
+ * @param calculationMode 计算模式：'time' 或 'depth'（可选）
+ * @param movetime 思考时间毫秒（可选）
  * @returns UCI 格式的最佳着法（如 "e2e4"）
  */
-export async function getBestMove(fen: string, depth: number = 10, skillLevel?: number): Promise<string> {
+export async function getBestMove(
+  fen: string, 
+  depth: number = 20, 
+  skillLevel?: number,
+  threads?: number,
+  hash?: number,
+  calculationMode?: string,
+  movetime?: number
+): Promise<string> {
   try {
-    console.log(`请求 AI 着法，FEN: ${fen}, 深度: ${depth}, AI等级: ${skillLevel ?? '默认'}`);
+    console.log(`请求 AI 着法，FEN: ${fen}, 深度: ${depth}, AI等级: ${skillLevel ?? '默认'}, 线程: ${threads ?? '默认'}, Hash: ${hash ?? '默认'}, 模式: ${calculationMode ?? 'depth'}, 时间: ${movetime ?? '默认'}`);
     const bestMove = await invoke<string>('get_best_move', {
       fen,
       depth,
-      skillLevel: skillLevel !== undefined ? skillLevel : null
+      skillLevel: skillLevel !== undefined ? skillLevel : null,
+      threads: threads !== undefined ? threads : null,
+      hash: hash !== undefined ? hash : null,
+      calculationMode: calculationMode || null,
+      movetime: movetime !== undefined ? movetime : null
     });
     console.log('AI 最佳着法:', bestMove);
     return bestMove;

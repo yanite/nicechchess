@@ -12,7 +12,17 @@ setoption name <选项名> value <值>：
    配置参数。
    例如：setoption name Threads value 16（设置线程数为 16）。
    例如：setoption name Hash value 2048（设置哈希表大小）
-   position startpos moves <走法列表>：设置局面。moves 后接已经走过的招法（如 e2e4），引擎会自动推导出当前盘面。也可以直接输入 FEN 串：position fen <FEN字符串>。go：开始计算。go movetime 1000：计算 1000 毫秒后输出结果。go depth 20：计算到深度 20 层。stop：强制引擎停止计算并立即返回结果。quit：关闭并退出引擎程序。3. 解析输出引擎在接收到 go 指令后，会持续输出搜索进度（info depth ... score cp ...）。当计算完成时，它会发送：bestmove <走法>：告诉你它认为的最佳着法。
+   
+position startpos moves <走法列表>：设置局面。
+moves 后接已经走过的招法（如 e2e4），引擎会自动推导出当前盘面。
+也可以直接输入 FEN 串position fen <FEN字符串>。
+go：开始计算。
+go movetime 1000：计算 1000 毫秒后输出结果。
+go depth 20：计算到深度 20 层。
+stop：强制引擎停止计算并立即返回结果。
+quit：关闭并退出引擎程序。
+3. 解析输出引擎在接收到 go 指令后，会持续输出搜索进度（info depth ... score cp ...）。
+当计算完成时，它会发送：bestmove <走法>：告诉你它认为的最佳着法。
 
 ## 🎮 功能特性
 
