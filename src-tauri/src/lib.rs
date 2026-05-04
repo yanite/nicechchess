@@ -68,14 +68,23 @@ pub fn run() {
             
             // 监听窗口移动和调整大小事件
             if let Some(window) = app.get_webview_window("main") {
+                use std::sync::atomic::{AtomicBool, Ordering};
+                static SAVE_PENDING: AtomicBool = AtomicBool::new(false);
+                
                 let window_clone = window.clone();
                 window.on_window_event(move |event| {
                     match event {
                         tauri::WindowEvent::Moved(_) | tauri::WindowEvent::Resized(_) => {
+                            // 如果已有保存任务在等待，则跳过
+                            if SAVE_PENDING.swap(true, Ordering::SeqCst) {
+                                return;
+                            }
+                            
                             // 延迟保存，避免频繁写入（增加到2秒）
                             let win = window_clone.clone();
                             std::thread::spawn(move || {
                                 std::thread::sleep(std::time::Duration::from_millis(2000));
+                                
                                 if let Ok(position) = win.outer_position() {
                                     if let Ok(size) = win.outer_size() {
                                         if let Ok(mut config) = AppConfig::load() {
@@ -83,10 +92,18 @@ pub fn run() {
                                             config.window.y = position.y;
                                             config.window.width = size.width;
                                             config.window.height = size.height;
-                                            let _ = config.save();
+                                            if let Err(e) = config.save() {
+                                                eprintln!("保存配置失败: {}", e);
+                                            } else {
+                                                println!("窗口状态已保存: x={}, y={}, w={}, h={}", 
+                                                    position.x, position.y, size.width, size.height);
+                                            }
                                         }
                                     }
                                 }
+                                
+                                // 重置标志，允许下次保存
+                                SAVE_PENDING.store(false, Ordering::SeqCst);
                             });
                         }
                         _ => {}
