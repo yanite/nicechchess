@@ -1712,6 +1712,7 @@ onBeforeUnmount(() => {
   transform: translate(-50%, -50%);
   z-index: 1000;
   animation: pulse 0.5s ease-in-out infinite alternate;
+  pointer-events: none; /* 让点击事件穿透提示层 */
 }
 
 .alert-image {
