@@ -1,19 +1,9 @@
 <template>
   <div ref="container" class="chess-board-3d">
-    <!-- 新开局按钮 -->
-    <button class="new-game-btn" @click="showNewGameDialog = true">新开局</button>
-    
     <!-- 将军/绝杀提示图片 -->
     <div v-if="showCheckAlert" class="check-alert">
       <img :src="alertImage" alt="提示" class="alert-image" />
     </div>
-    
-    <!-- 新开局对话框 -->
-    <NewGameDialog 
-      :visible="showNewGameDialog"
-      @close="showNewGameDialog = false"
-      @confirm="handleNewGame"
-    />
   </div>
 </template>
 
@@ -29,15 +19,11 @@ import { PIECES, type PieceType, type Board, UCIToMove } from '../../logic/chess
 import { isValidMove, isInCheck } from '../../logic/chess/rules';
 import checkImage from '../../assets/将军.png';
 import checkmateImage from '../../assets/绝杀.png';
-import NewGameDialog, { type NewGameConfig } from '../NewGameDialog.vue';
 import { startEngine, getBestMove } from '../../services/engineService';
 import { loadConfig } from '../../services/configService';
 
 const container = ref<HTMLDivElement | null>(null);
 const chessStore = useChessStore();
-
-// 新开局对话框状态
-const showNewGameDialog = ref(false);
 
 // 将军/绝杀提示相关状态
 const showCheckAlert = ref(false);
@@ -1398,35 +1384,6 @@ function executeAIMove(fromRow: number, fromCol: number, toRow: number, toCol: n
 }
 
 /**
- * 处理新开局确认
- */
-function handleNewGame(config: NewGameConfig) {
-  console.log('新开局配置:', config);
-  
-  // TODO: 根据配置初始化游戏
-  // 1. 重置棋盘状态
-  chessStore.resetGame();
-  
-  // 2. 设置玩家信息（需要扩展chessStore）
-  // chessStore.setPlayers(config.blackPlayer, config.redPlayer);
-  
-  // 3. 设置时间控制（需要扩展chessStore）
-  // chessStore.setTimeControl(config.timePerMove);
-  
-  // 4. 如果黑方是AI，触发AI行棋
-  if (config.blackPlayer.useAI) {
-    console.log('黑方使用AI，等级:', config.blackPlayer.aiLevel);
-    // TODO: 设置AI等级并触发AI行棋
-    setTimeout(() => {
-      triggerAIMove();
-    }, 1000);
-  }
-  
-  // 5. 显示提示
-  alert(`新游戏开始！\n黑方：${config.blackPlayer.name}${config.blackPlayer.useAI ? ' (AI Lv.' + config.blackPlayer.aiLevel + ')' : ''}\n红方：${config.redPlayer.name}${config.redPlayer.useAI ? ' (AI Lv.' + config.redPlayer.aiLevel + ')' : ''}\n每步用时：${config.timePerMove}秒`);
-}
-
-/**
  * 显示将军提示
  */
 function displayCheckAlert() {
@@ -1570,7 +1527,7 @@ function hideCheckAlert() {
 watch(
   () => chessStore.board,
   () => {
-    console.log('检测到棋盘状态变化，同步3D视图');
+    // console.log('检测到棋盘状态变化，同步3D视图');
     syncPiecesWithBoard();
   },
   { deep: true }
@@ -1757,33 +1714,6 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 100%;
   position: relative;
-}
-
-/* 新开局按钮 */
-.new-game-btn {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  padding: 12px 24px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-  transition: all 0.3s;
-  z-index: 1000; /* 提高z-index确保在canvas之上 */
-}
-
-.new-game-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(102, 126, 234, 0.6);
-}
-
-.new-game-btn:active {
-  transform: translateY(0);
 }
 
 .check-alert {

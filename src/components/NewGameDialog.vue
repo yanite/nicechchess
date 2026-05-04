@@ -221,147 +221,127 @@ watch(() => props.visible, (newVal) => {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.6);
+  background-color: rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 2000;
-  backdrop-filter: blur(4px);
 }
 
 .new-game-dialog {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-radius: 16px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   width: 90%;
   max-width: 500px;
   max-height: 80vh;
   overflow-y: auto;
-  animation: slideIn 0.3s ease-out;
-}
-
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateY(-30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 .dialog-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px 24px;
-  border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+  padding: 16px 20px;
+  border-bottom: 1px solid #e0e0e0;
 }
 
 .dialog-header h2 {
   margin: 0;
-  color: white;
-  font-size: 24px;
+  color: #333;
+  font-size: 18px;
   font-weight: 600;
 }
 
 .close-btn {
   background: none;
   border: none;
-  color: white;
-  font-size: 32px;
+  color: #666;
+  font-size: 28px;
   cursor: pointer;
   padding: 0;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   line-height: 1;
-  transition: transform 0.2s;
 }
 
 .close-btn:hover {
-  transform: scale(1.2);
+  color: #333;
 }
 
 .dialog-content {
-  padding: 24px;
+  padding: 20px;
 }
 
 .player-section {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
 .player-section h3 {
-  color: white;
-  font-size: 18px;
-  margin: 0 0 16px 0;
-  padding-bottom: 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+  color: #333;
+  font-size: 16px;
+  margin: 0 0 12px 0;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #e0e0e0;
 }
 
 .form-group {
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .form-group label {
   display: block;
-  color: rgba(255, 255, 255, 0.9);
-  margin-bottom: 8px;
+  color: #555;
+  margin-bottom: 6px;
   font-size: 14px;
 }
 
 .form-group input[type="text"],
 .form-group input[type="number"] {
   width: 100%;
-  padding: 10px 12px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
+  padding: 8px 10px;
+  border: 1px solid #d0d0d0;
+  border-radius: 4px;
+  background: white;
+  color: #333;
   font-size: 14px;
-  transition: all 0.3s;
 }
 
 .form-group input[type="text"]:focus,
 .form-group input[type="number"]:focus {
   outline: none;
-  border-color: rgba(255, 255, 255, 0.6);
-  background: rgba(255, 255, 255, 0.15);
-}
-
-.form-group input[type="text"]::placeholder {
-  color: rgba(255, 255, 255, 0.5);
+  border-color: #4a90e2;
 }
 
 .checkbox-group {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .checkbox-label {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   cursor: pointer;
-  color: rgba(255, 255, 255, 0.9);
+  color: #555;
   font-size: 14px;
 }
 
 .checkbox-label input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   cursor: pointer;
 }
 
 .ai-level-group {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-left: 26px;
-  padding: 12px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
+  gap: 10px;
+  margin-left: 22px;
+  padding: 8px;
+  background: #f5f5f5;
+  border-radius: 4px;
 }
 
 .ai-level-group label {
@@ -371,101 +351,93 @@ watch(() => props.visible, (newVal) => {
 
 .ai-level-group input[type="range"] {
   flex: 1;
-  height: 6px;
+  height: 4px;
   -webkit-appearance: none;
   appearance: none;
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 3px;
+  background: #d0d0d0;
+  border-radius: 2px;
   outline: none;
 }
 
 .ai-level-group input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 18px;
-  height: 18px;
-  background: white;
+  width: 16px;
+  height: 16px;
+  background: #4a90e2;
   border-radius: 50%;
   cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
 }
 
 .level-value {
-  color: white;
+  color: #333;
   font-weight: 600;
-  font-size: 16px;
-  min-width: 30px;
+  font-size: 14px;
+  min-width: 28px;
   text-align: center;
 }
 
 .divider {
   height: 1px;
-  background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.3), transparent);
-  margin: 24px 0;
+  background: #e0e0e0;
+  margin: 16px 0;
 }
 
 .time-section h3 {
-  color: white;
-  font-size: 18px;
-  margin: 0 0 16px 0;
-  padding-bottom: 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+  color: #333;
+  font-size: 16px;
+  margin: 0 0 12px 0;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #e0e0e0;
 }
 
 .dialog-footer {
   display: flex;
   justify-content: flex-end;
-  gap: 12px;
-  padding: 20px 24px;
-  border-top: 2px solid rgba(255, 255, 255, 0.2);
+  gap: 10px;
+  padding: 16px 20px;
+  border-top: 1px solid #e0e0e0;
 }
 
 .dialog-footer button {
-  padding: 10px 24px;
-  border: none;
-  border-radius: 8px;
+  padding: 8px 20px;
+  border: 1px solid #d0d0d0;
+  border-radius: 4px;
   font-size: 14px;
-  font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s;
+  background: white;
+  color: #333;
 }
 
-.cancel-btn {
-  background: rgba(255, 255, 255, 0.2);
-  color: white;
-}
-
-.cancel-btn:hover {
-  background: rgba(255, 255, 255, 0.3);
+.dialog-footer button:hover {
+  background: #f5f5f5;
 }
 
 .confirm-btn {
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  background: #4a90e2;
   color: white;
-  box-shadow: 0 4px 12px rgba(245, 87, 108, 0.4);
+  border-color: #4a90e2;
 }
 
 .confirm-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(245, 87, 108, 0.5);
+  background: #357abd;
 }
 
 /* 滚动条样式 */
 .new-game-dialog::-webkit-scrollbar {
-  width: 8px;
+  width: 6px;
 }
 
 .new-game-dialog::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
+  background: #f0f0f0;
 }
 
 .new-game-dialog::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 4px;
+  background: #c0c0c0;
+  border-radius: 3px;
 }
 
 .new-game-dialog::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.4);
+  background: #a0a0a0;
 }
 </style>

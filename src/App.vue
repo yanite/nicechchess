@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import ChessBoard3D from './components/3d/ChessBoard3D.vue';
 import SettingsDialog from './components/SettingsDialog.vue';
+import NewGameDialog, { type NewGameConfig } from './components/NewGameDialog.vue';
 import { useChessStore } from './store/chessStore';
 import { computed, ref, onMounted, onUnmounted } from 'vue';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
 const chessStore = useChessStore();
 const showSettings = ref(false);
+const showNewGameDialog = ref(false);
 
 // 窗口状态管理
 const WINDOW_STATE_KEY = 'chchess_window_state';
@@ -322,6 +324,24 @@ function onSettingsChanged(settings: any) {
   console.log('设置已更改:', settings);
   // TODO: 通知ChessBoard3D组件更新配置
 }
+
+// 打开新游戏对话框
+function openNewGameDialog() {
+  showNewGameDialog.value = true;
+}
+
+// 处理新游戏确认
+function handleNewGame(config: NewGameConfig) {
+  console.log('新开局配置:', config);
+  
+  // 重置棋盘状态
+  chessStore.resetGame();
+  
+  // TODO: 根据配置设置玩家信息和AI等级
+  // 目前先显示提示
+  alert(`新游戏开始！\n黑方：${config.blackPlayer.name}${config.blackPlayer.useAI ? ' (AI Lv.' + config.blackPlayer.aiLevel + ')' : ''}\n红方：${config.redPlayer.name}${config.redPlayer.useAI ? ' (AI Lv.' + config.redPlayer.aiLevel + ')' : ''}\n每步用时：${config.timePerMove}秒`);
+}
+
 </script>
 
 <template>
@@ -329,7 +349,7 @@ function onSettingsChanged(settings: any) {
     <!-- 顶部菜单栏（可选） -->
     <header class="menu-bar">
       <div class="menu-items">
-        <button @click="resetGame">新游戏</button>
+        <button @click="openNewGameDialog">新游戏</button>
         <button @click="undoMove" :disabled="!chessStore.canUndo">悔棋</button>
         <button @click="redoMove" :disabled="!chessStore.canRedo">重做</button>
         <button @click="openSettings">选项</button>
@@ -345,6 +365,13 @@ function onSettingsChanged(settings: any) {
       :visible="showSettings" 
       @update:visible="showSettings = $event"
       @settings-changed="onSettingsChanged"
+    />
+
+    <!-- 新开局对话框 -->
+    <NewGameDialog 
+      :visible="showNewGameDialog"
+      @close="showNewGameDialog = false"
+      @confirm="handleNewGame"
     />
 
     <!-- 主内容区 -->
