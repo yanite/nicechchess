@@ -17,6 +17,7 @@
 | 7 | FEN 行棋方标识符错误 | 🟡 中等 | ✅ 已修复 |
 | 8 | AI 着法缺少规则验证 | 🟡 中等 | ✅ 已修复 |
 | 9 | 窗口移动导致频繁重新编译 | 🔴 严重 | ✅ 已修复 |
+| 10 | config.rs 文件异常膨胀 | 🔴 严重 | ✅ 已修复 |
 
 ---
 
@@ -41,7 +42,7 @@ error[E0599]: no method named `lock` found for enum `Option<T>` in the current s
 - 正确的嵌套顺序应该是 `Mutex<Option<Child>>`
 
 **修复方案：**
-```rust
+``rust
 // 修复前（错误）
 pub struct EngineState {
     pub process: Option<Mutex<Child>>,  // ❌ 错误的嵌套顺序
@@ -284,7 +285,7 @@ Running DevCommand (`cargo run --no-default-features --color always --`)
 **修复方案：**
 
 1. **修改配置存储位置到系统配置目录**：
-```rust
+``rust
 // 修复前（错误）❌
 fn get_config_path() -> PathBuf {
     PathBuf::from("config.yaml")  // 项目目录
@@ -319,6 +320,43 @@ std::thread::sleep(std::time::Duration::from_millis(2000));
 3. 检查系统配置目录（Windows: `%APPDATA%\chchess\config.yaml`）是否有配置文件
 
 **相关提交：** `1c59b91`
+
+---
+
+### **Bug #10: config.rs 文件异常膨胀**
+
+**发现时间：** 2026-05-04  
+**影响范围：** `src-tauri/src/config.rs`  
+**现象描述：**
+- config.rs 文件大小异常达到 134.9KB（正常应为 ~3KB）
+- 编译时报错：`let chains are only allowed in Rust 2024 or later`
+- 错误指向第719、918、969行，但这些行不应该存在于我们的代码中
+
+**根本原因：**
+- config.rs 文件被意外修改，包含了大量不应该的内容（可能是复制粘贴错误或编辑器问题）
+- Git历史显示原始文件只有117行，但当前文件有数千行
+
+**修复方案：**
+``bash
+# 从Git恢复原始版本
+git checkout HEAD -- src-tauri/src/config.rs
+```
+
+然后重新应用必要的修改：
+1. 配置路径保持在项目根目录（`PathBuf::from("config.yaml")`）
+2. 保持lib.rs中的2秒防抖时间
+
+**验证方法：**
+1. 检查config.rs文件大小是否正常（~3-4KB）
+2. 运行 `cargo build` 确认编译通过
+3. 启动应用测试窗口移动功能
+
+**相关提交：** `7fdc7f3` - "修复：将配置路径改回项目根目录"
+
+**经验教训：**
+- ⚠️ 定期检查关键文件的大小和行数，防止意外修改
+- ✅ 使用Git跟踪文件变化，及时发现异常
+- ✅ 遇到奇怪的编译错误时，先检查文件是否被意外修改
 
 ---
 
