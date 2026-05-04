@@ -22,6 +22,7 @@
 | 12 | 配置管理架构优化 - 内存缓存 | 🟡 中等 | ✅ 已修复 |
 | 13 | 棋子字体漂浮和方向错误 | 🟡 中等 | ✅ 已修复 |
 | 14 | 柱型棋子嵌入棋盘及点击命中问题 | 🟡 中等 | ✅ 已修复 |
+| 15 | 棋子移动后重新嵌入棋盘 | 🟡 中等 | ✅ 已修复 |
 
 ---
 
@@ -697,6 +698,66 @@ textMesh.raycast = () => {}; // 禁用射线检测
 2. 点击柱型棋子，确认能正常拖动
 3. 对比鼓型和柱型的高度差异（柱型应该更矮）
 4. 检查点击时是否稳定命中棋子本体
+
+**相关提交：** （待提交）
+
+---
+
+### **Bug #15: 棋子移动后重新嵌入棋盘**
+
+**发现时间：** 2026-05-04（紧接 Bug #14 之后）  
+**影响范围：** `src/components/3d/ChessBoard3D.vue`  
+**现象：**
+- 修复 Bug #14 后，棋子初始位置正确
+- 但移动一步棋后，所有棋子又嵌入到棋盘里面
+
+**根本原因：**
+在多个函数中错误地覆盖了 [createPieceMesh](file://v:\4_mydoc\tauri\nicechchess\src\components\3d\ChessBoard3D.vue#L602-L693) 中已正确计算的y坐标：
+
+1. **[syncPiecesWithBoard](file://v:\4_mydoc\tauri\nicechchess\src\components\3d\ChessBoard3D.vue#L776-L842)** (第815行)：
+   ```typescript
+   pieceMesh.position.y = 0; // ❌ 覆盖了正确的y坐标
+   ```
+
+2. **[resetPiecePosition](file://v:\4_mydoc\tauri\nicechchess\src\components\3d\ChessBoard3D.vue#L1413-L1423)** (第1421行)：
+   ```typescript
+   pieceMesh.position.y = 0.01; // ❌ 覆盖了正确的y坐标
+   ```
+
+3. **[onMouseUp](file://v:\4_mydoc\tauri\nicechchess\src\components\3d\ChessBoard3D.vue#L1050-L1140)** (第1112和1124行)：
+   ```typescript
+   (targetMesh as THREE.Mesh).position.y = 0.01; // ❌ 被吃掉的棋子
+   draggedPiece.position.y = 0.01; // ❌ 移动的棋子
+   ```
+
+这些代码都假设棋子高度是固定的，没有考虑柱型和鼓型的不同几何体结构。
+
+**修复方案：**
+
+移除所有手动设置y坐标的代码，保留 [createPieceMesh](file://v:\4_mydoc\tauri\nicechchess\src\components\3d\ChessBoard3D.vue#L602-L693) 中根据棋子形状动态计算的y坐标：
+
+``typescript
+// 修复前（错误）
+pieceMesh.position.x = startX + col * CELL_SIZE;
+pieceMesh.position.z = startZ + row * CELL_SIZE;
+pieceMesh.position.y = 0; // ❌ 覆盖正确的y坐标
+
+// 修复后（正确）
+pieceMesh.position.x = startX + col * CELL_SIZE;
+pieceMesh.position.z = startZ + row * CELL_SIZE;
+// ✅ 不设置y坐标，保持createPieceMesh中的正确值
+```
+
+**修改的函数：**
+1. [syncPiecesWithBoard](file://v:\4_mydoc\tauri\nicechchess\src\components\3d\ChessBoard3D.vue#L776-L842) - 同步棋盘状态时重建棋子
+2. [resetPiecePosition](file://v:\4_mydoc\tauri\nicechchess\src\components\3d\ChessBoard3D.vue#L1413-L1423) - 重置棋子位置
+3. [onMouseUp](file://v:\4_mydoc\tauri\nicechchess\src\components\3d\ChessBoard3D.vue#L1050-L1140) - 放下棋子和处理被吃棋子
+
+**验证方法：**
+1. 启动应用，观察棋子初始位置是否正确
+2. 移动一个棋子，观察所有棋子是否保持在正确高度
+3. 多次移动棋子，确认不会出现嵌入问题
+4. 测试吃掉棋子的场景，确认被吃棋子位置正确
 
 **相关提交：** （待提交）
 
