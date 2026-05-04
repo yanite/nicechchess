@@ -21,6 +21,7 @@
 | 11 | 窗口状态保存循环调用 | 🔴 严重 | ✅ 已修复 |
 | 12 | 配置管理架构优化 - 内存缓存 | 🟡 中等 | ✅ 已修复 |
 | 13 | 棋子字体漂浮和方向错误 | 🟡 中等 | ✅ 已修复 |
+| 14 | 柱型棋子嵌入棋盘及点击命中问题 | 🟡 中等 | ✅ 已修复 |
 
 ---
 
@@ -636,11 +637,77 @@ console.log('加载对方棋子字体方向配置:', opponentTextDirection);
 
 ---
 
+### **Bug #14: 柱型棋子嵌入棋盘及点击命中问题**
+
+**发现时间：** 2026-05-04（紧接 Bug #13 之后）  
+**影响范围：** `src/components/3d/ChessBoard3D.vue`  
+**现象：**
+- 修复 Bug #13 后，柱型棋子嵌入到棋盘里面
+- 需要确保点击时命中棋子本体而不是文字贴图
+
+**根本原因：**
+1. **棋子嵌入问题：**
+   - 柱型使用 `CylinderGeometry`，几何体中心在原点，高度范围是 `-height/2` 到 `+height/2`
+   - 将 `mesh.position.y = 0.01` 时，实际底部位置是 `0.01 - height/2`，导致嵌入棋盘
+   - 需要将整个 mesh 上移 `height/2`，使底部位于 `y=0.01`
+
+2. **点击命中问题：**
+   - 文字贴图作为子对象添加到棋子 mesh 中
+   - 射线检测可能先命中文字贴图而非棋子本体
+   - 虽然代码已有向上查找父对象的逻辑，但不够可靠
+
+**修复方案：**
+
+1. **调整柱型棋子高度和位置：**
+``typescript
+// 修复前（错误）
+const height = CELL_SIZE * 0.35;    // 固定高度
+const mesh = new THREE.Mesh(geometry, sideMaterial);
+mesh.position.y = 0.01; // 导致柱型嵌入棋盘
+
+// 修复后（正确）
+const fullHeight = CELL_SIZE * 0.35;
+const height = currentPieceShape === 'cylinder' ? fullHeight * 0.5 : fullHeight; // 柱型高度减半
+
+const mesh = new THREE.Mesh(geometry, sideMaterial);
+
+if (currentPieceShape === 'cylinder') {
+  // 柱型：圆柱几何体中心在原点，要让底部在 y=0.01，需要上移 height/2
+  mesh.position.y = 0.01 + height / 2;
+} else {
+  // 鼓型：LatheGeometry 从 y=0 开始，直接放在棋盘上
+  mesh.position.y = 0.01;
+}
+```
+
+2. **禁用文字贴图的射线检测：**
+``typescript
+// 添加顶部文字贴图
+const textMesh = new THREE.Mesh(textGeometry, textMaterial);
+textMesh.rotation.x = -Math.PI / 2;
+
+// 设置文字贴图不参与射线检测，确保点击命中棋子本体
+textMesh.raycast = () => {}; // 禁用射线检测
+
+// 然后设置位置和添加到父对象
+```
+
+**验证方法：**
+1. 启动应用，观察柱型棋子是否完全在棋盘上方，不再嵌入
+2. 点击柱型棋子，确认能正常拖动
+3. 对比鼓型和柱型的高度差异（柱型应该更矮）
+4. 检查点击时是否稳定命中棋子本体
+
+**相关提交：** （待提交）
+
+---
+
 ## 📚 **参考资料**
 
 - [UCI 协议规范](https://www.shredderchess.com/download/div/uci.zip)
 - [Pikafish 官方文档](http://pikafish.com)
 - [中国象棋 FEN 格式说明](https://www.xiangqiai.com)
+- [Three.js Raycaster 文档](https://threejs.org/docs/#api/en/core/Raycaster)
 
 ---
 

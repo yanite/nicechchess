@@ -602,7 +602,8 @@ function createWoodTexture(): THREE.CanvasTexture {
  */
 function createPieceMesh(piece: PieceType, _row: number, _col: number): THREE.Mesh {
   const baseRadius = CELL_SIZE * 0.4; // 基础半径
-  const height = CELL_SIZE * 0.35;    // 棋子高度
+  const fullHeight = CELL_SIZE * 0.35;    // 原始棋子高度
+  const height = currentPieceShape === 'cylinder' ? fullHeight * 0.5 : fullHeight; // 柱型高度减半
   
   let geometry: THREE.BufferGeometry;
   
@@ -653,7 +654,18 @@ function createPieceMesh(piece: PieceType, _row: number, _col: number): THREE.Me
   });
   
   const mesh = new THREE.Mesh(geometry, sideMaterial);
-  mesh.position.y = 0.01; // 直接放在棋盘线上方，几何体底部在y=0
+  
+  // 根据棋子形状设置y坐标位置
+  if (currentPieceShape === 'cylinder') {
+    // 柱型：圆柱几何体中心在原点，高度从 -height/2 到 +height/2
+    // 要让底部在 y=0.01，需要将mesh整体上移 height/2
+    mesh.position.y = 0.01 + height / 2;
+  } else {
+    // 鼓型：LatheGeometry 从 y=0 开始到 y=height
+    // 直接放在棋盘上即可
+    mesh.position.y = 0.01;
+  }
+  
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   
@@ -667,10 +679,13 @@ function createPieceMesh(piece: PieceType, _row: number, _col: number): THREE.Me
   const textMesh = new THREE.Mesh(textGeometry, textMaterial);
   textMesh.rotation.x = -Math.PI / 2; // 水平放置
   
+  // 设置文字贴图不参与射线检测，确保点击命中棋子本体
+  textMesh.raycast = () => {}; // 禁用射线检测
+  
   // 修复文字贴图位置：根据棋子形状调整
   if (currentPieceShape === 'cylinder') {
-    // 柱型：圆柱几何体中心在原点，高度从 -height/2 到 +height/2
-    // 所以顶部在 height/2 位置
+    // 柱型：圆柱几何体中心在原点，顶部在 height/2 位置（相对于mesh中心）
+    // 文字贴图应该在顶部表面上方一点点
     textMesh.position.y = height / 2 + 0.001;
   } else {
     // 鼓型：使用 LatheGeometry，几何体从 y=0 开始到 y=height
