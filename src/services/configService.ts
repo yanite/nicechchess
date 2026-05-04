@@ -55,7 +55,7 @@ const DEFAULT_CONFIG: AppConfig = {
     depth: 20,
   },
   ui: {
-    board_texture: 'src/assets/textures/tx1/dark_wood_diff_1k.jpg',
+    board_texture: 'src/assets/textures/tx1/wood_diff_1k.jpg',
     opponent_text_direction: 'down',
     piece_shape: 'cylinder',
   },

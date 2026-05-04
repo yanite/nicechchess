@@ -231,7 +231,7 @@ const settings = ref<Settings>({
     depth: 20,
   },
   ui: {
-    board_texture: 'src/assets/textures/tx1/dark_wood_diff_1k.jpg',
+    board_texture: 'src/assets/textures/tx1/wood_diff_1k.jpg',
     opponent_text_direction: 'down',
     piece_shape: 'cylinder',
   },
@@ -252,7 +252,7 @@ async function loadSettings() {
     settings.value.engine.movetime = (config.engine as any).movetime ?? 1000;
     settings.value.engine.depth = (config.engine as any).depth ?? 10;
     
-    settings.value.ui.board_texture = config.ui.board_texture || 'src/assets/textures/tx1/dark_wood_diff_1k.jpg';
+    settings.value.ui.board_texture = config.ui.board_texture || 'src/assets/textures/tx1/wood_diff_1k.jpg';
     settings.value.ui.opponent_text_direction = (config.ui as any).opponent_text_direction || 'down';
     settings.value.ui.piece_shape = (config.ui as any).piece_shape || 'cylinder';
     
@@ -481,7 +481,7 @@ async function selectEnginePath() {
 function onTextureChange() {
   if (selectedTexture.value !== 'custom') {
     // 构建纹理路径
-    settings.value.ui.board_texture = `src/assets/textures/${selectedTexture.value}/dark_wood_diff_1k.jpg`;
+    settings.value.ui.board_texture = `src/assets/textures/${selectedTexture.value}/wood_diff_1k.jpg`;
     saveSettings();
   }
 }

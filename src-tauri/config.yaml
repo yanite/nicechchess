@@ -6,4 +6,4 @@ window:
 engine:
   pikafish_path: public/pikafish/pikafish-vnni512.exe
 ui:
-  board_texture: src/assets/textures/tx1/dark_wood_diff_1k.jpg
+  board_texture: src/assets/textures/tx1/wood_diff_1k.jpg
