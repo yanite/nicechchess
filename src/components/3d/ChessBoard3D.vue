@@ -597,13 +597,13 @@ function createPieceMesh(piece: PieceType, _row: number, _col: number): THREE.Me
   const height = CELL_SIZE * 0.35;    // 棋子高度
   const bulgeAmount = CELL_SIZE * 0.08; // 鼓出程度
   
-  // 创建鼓型轮廓点
+  // 创建鼓型轮廓点（从底部到顶部，y从0到height）
   const points: THREE.Vector2[] = [];
   const segments = 16; // 垂直采样点
   
   for (let i = 0; i <= segments; i++) {
     const t = i / segments; // 0 到 1
-    const y = (t - 0.5) * height; // y 轴从 -height/2 到 height/2
+    const y = t * height; // y 轴从 0 到 height
     
     // 使用正弦函数实现"中间鼓、上下缩"的圆弧
     const radius = baseRadius + Math.sin(t * Math.PI) * bulgeAmount;
@@ -611,11 +611,11 @@ function createPieceMesh(piece: PieceType, _row: number, _col: number): THREE.Me
     points.push(new THREE.Vector2(radius, y));
   }
   
-  // 封闭顶部和底部，让它看起来是实心的
+  // 封闭底部和顶部，让它看起来是实心的
   const allPoints = [
-    new THREE.Vector2(0, -height / 2), // 底圆中心点
+    new THREE.Vector2(0, 0),         // 底部中心点
     ...points,
-    new THREE.Vector2(0, height / 2)   // 顶圆中心点
+    new THREE.Vector2(0, height)     // 顶部中心点
   ];
   
   // 使用 LatheGeometry 旋转成型
@@ -639,7 +639,7 @@ function createPieceMesh(piece: PieceType, _row: number, _col: number): THREE.Me
   });
   
   const mesh = new THREE.Mesh(geometry, sideMaterial);
-  mesh.position.y = 0.01 + height / 2; // 放在棋盘线上方（y=0.01），加上半个厚度
+  mesh.position.y = 0.01; // 直接放在棋盘线上方，几何体底部在y=0
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   
@@ -652,8 +652,8 @@ function createPieceMesh(piece: PieceType, _row: number, _col: number): THREE.Me
   });
   const textMesh = new THREE.Mesh(textGeometry, textMaterial);
   textMesh.rotation.x = -Math.PI / 2; // 水平放置
-  // 文字贴图相对于棋子中心，放在顶部
-  textMesh.position.y = height / 2 + 0.001; // 棋子中心在0，顶部在height/2
+  // 文字贴图放在棋子顶部，相对于棋子底部
+  textMesh.position.y = height + 0.001; // 顶部在height位置
   mesh.add(textMesh);
   
   return mesh;
@@ -1077,10 +1077,9 @@ function executeMove(fromRow: number, fromCol: number, toRow: number, toCol: num
   
   const startX = -((BOARD_WIDTH - 1) * CELL_SIZE) / 2;
   const startZ = -((BOARD_HEIGHT - 1) * CELL_SIZE) / 2;
-  const height = CELL_SIZE * 0.35; // 棋子高度
   draggedPiece.position.x = startX + toCol * CELL_SIZE;
   draggedPiece.position.z = startZ + toRow * CELL_SIZE;
-  draggedPiece.position.y = 0.01 + height / 2; // 放在棋盘线上方
+  draggedPiece.position.y = 0.01; // 放在棋盘线上方
   
   // 4. 更新棋盘数据
   chessStore.movePiece(fromRow, fromCol, toRow, toCol);
@@ -1377,7 +1376,7 @@ function resetPiecePosition(pieceMesh: THREE.Mesh) {
   
   pieceMesh.position.x = startX + col * CELL_SIZE;
   pieceMesh.position.z = startZ + row * CELL_SIZE;
-  pieceMesh.position.y = 0.01 + height / 2; // 放在棋盘线上方
+  pieceMesh.position.y = 0.01; // 放在棋盘线上方
 }
 
 /**
