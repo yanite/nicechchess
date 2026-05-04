@@ -1774,7 +1774,7 @@ onBeforeUnmount(() => {
   cursor: pointer;
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
   transition: all 0.3s;
-  z-index: 100;
+  z-index: 1000; /* 提高z-index确保在canvas之上 */
 }
 
 .new-game-btn:hover {

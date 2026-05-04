@@ -212,16 +212,16 @@ onMounted(async () => {
   
   try {
     unlistenMove = await appWindow.onMoved((event) => {
-      console.log('窗口移动事件触发:', event.payload);
+      // console.log('窗口移动事件触发:', event.payload);
       saveWindowStateDebounced();
     });
-    console.log('窗口移动监听器已注册');
+    // console.log('窗口移动监听器已注册');
     
     unlistenResize = await appWindow.onResized((event) => {
-      console.log('窗口调整大小事件触发:', event.payload);
+      // console.log('窗口调整大小事件触发:', event.payload);
       saveWindowStateDebounced();
     });
-    console.log('窗口调整大小监听器已注册');
+    // console.log('窗口调整大小监听器已注册');
   } catch (error) {
     console.error('注册窗口监听器失败:', error);
   }
