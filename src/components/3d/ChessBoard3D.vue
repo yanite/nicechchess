@@ -535,7 +535,7 @@ function createPieces() {
  */
 function createPieceMesh(piece: PieceType, _row: number, _col: number): THREE.Mesh {
   const radius = CELL_SIZE * 0.4;
-  const height = CELL_SIZE * 0.25;
+  const height = CELL_SIZE * 0.35; // 增加棋子厚度从0.25到0.35
   
   // 圆柱体几何
   const geometry = new THREE.CylinderGeometry(radius, radius, height, 32);
@@ -740,6 +740,32 @@ function syncPiecesWithBoard() {
   }
   
   console.log(`3D棋子同步完成，共创建 ${piecesGroup.children.length} 个棋子`);
+}
+
+/**
+ * 平滑移动棋子到目标位置（带动画效果）
+ */
+function animatePieceMove(pieceMesh: THREE.Mesh, targetX: number, targetZ: number, duration: number = 300) {
+  const startX = pieceMesh.position.x;
+  const startZ = pieceMesh.position.z;
+  const startTime = Date.now();
+  
+  function animate() {
+    const elapsed = Date.now() - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+    
+    // 使用缓动函数（ease-out）
+    const easedProgress = 1 - Math.pow(1 - progress, 3);
+    
+    pieceMesh.position.x = startX + (targetX - startX) * easedProgress;
+    pieceMesh.position.z = startZ + (targetZ - startZ) * easedProgress;
+    
+    if (progress < 1) {
+      requestAnimationFrame(animate);
+    }
+  }
+  
+  animate();
 }
 
 /**
@@ -1199,22 +1225,25 @@ function executeAIMove(fromRow: number, fromCol: number, toRow: number, toCol: n
     }
   }
   
-  // 移动 AI 棋子
+  // 移动 AI 棋子（使用平滑动画）
   const aiUserData = (aiPiece as THREE.Mesh).userData as any;
   aiUserData.row = toRow;
   aiUserData.col = toCol;
   
   const startX = -((BOARD_WIDTH - 1) * CELL_SIZE) / 2;
   const startZ = -((BOARD_HEIGHT - 1) * CELL_SIZE) / 2;
-  (aiPiece as THREE.Mesh).position.x = startX + toCol * CELL_SIZE;
-  (aiPiece as THREE.Mesh).position.z = startZ + toRow * CELL_SIZE;
-  (aiPiece as THREE.Mesh).position.y = 0;
+  const targetX = startX + toCol * CELL_SIZE;
+  const targetZ = startZ + toRow * CELL_SIZE;
   
-  // 更新棋盘数据
-  chessStore.movePiece(fromRow, fromCol, toRow, toCol);
+  // 使用平滑动画移动棋子（500ms）
+  animatePieceMove(aiPiece as THREE.Mesh, targetX, targetZ, 500);
   
-  // 检查将军/绝杀
-  checkCheckAndCheckmate(toRow, toCol);
+  // 延迟更新棋盘数据，等待动画完成
+  setTimeout(() => {
+    chessStore.movePiece(fromRow, fromCol, toRow, toCol);
+    // 检查将军/绝杀
+    checkCheckAndCheckmate(toRow, toCol);
+  }, 500);
 }
 
 /**
