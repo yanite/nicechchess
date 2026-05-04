@@ -664,3 +664,4 @@ function decrementTime() {
   outline: none;
   border-color: #4a90e2;
 }
+</style>
