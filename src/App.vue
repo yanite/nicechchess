@@ -342,6 +342,18 @@ function onSettingsChanged(settings: any) {
     movetime: settings.engine.movetime,
     depth: settings.engine.depth
   });
+  
+  // 手动触发 ChessBoard3D 的配置更新
+  // 通过 dispatchEvent 模拟 storage 事件，确保 ChessBoard3D 能检测到变化
+  const configData = localStorage.getItem('chchess_config');
+  if (configData) {
+    window.dispatchEvent(new StorageEvent('storage', {
+      key: 'chchess_config',
+      newValue: configData,
+      oldValue: null
+    }));
+    console.log('已触发配置更新事件');
+  }
 }
 
 // 打开新游戏对话框
