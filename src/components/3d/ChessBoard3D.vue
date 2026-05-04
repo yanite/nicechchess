@@ -57,6 +57,9 @@ let dragOffset = new THREE.Vector3(); // 拖动偏移量
 // 棋子形状配置
 let currentPieceShape: 'cylinder' | 'standard' = 'cylinder';
 
+// 对方棋子字体方向配置
+let opponentTextDirection: 'down' | 'up' = 'down';
+
 // 棋盘尺寸配置
 const BOARD_WIDTH = 9;
 const BOARD_HEIGHT = 10;
@@ -76,8 +79,10 @@ async function initScene() {
     const config = await loadConfig();
     boardTexturePath = config.ui.board_texture;
     currentPieceShape = config.ui.piece_shape || 'cylinder'; // 加载棋子形状
+    opponentTextDirection = config.ui.opponent_text_direction || 'down'; // 加载对方棋子字体方向
     console.log('加载棋盘纹理配置:', boardTexturePath);
     console.log('加载棋子形状配置:', currentPieceShape);
+    console.log('加载对方棋子字体方向配置:', opponentTextDirection);
   } catch (error) {
     console.warn('加载配置失败，使用默认纹理:', error);
   }
@@ -488,23 +493,21 @@ function createPieces() {
         pieceMesh.position.z = startZ + row * CELL_SIZE;
         // y坐标由createPieceMesh内部设置为 0.01 + height / 2
         
-        // 设置棋子文字朝向：都朝向楚河汉界（棋盘中心）
-        // 黑方在上方（row 0-4），文字需要旋转 -90 度
-        // 红方在下方（row 5-9），文字需要旋转 90 度
+        // 设置棋子文字朝向：根据配置的对方棋子字体方向和棋子颜色决定
         const isRed = piece > 0;
-        if (!isRed && row < 5) {
-          // 黑方棋子在上半部分，旋转 -90 度
-          pieceMesh.rotation.y = -Math.PI / 2;
-        } else if (isRed && row >= 5) {
-          // 红方棋子在下半部分，旋转 90 度
-          pieceMesh.rotation.y = Math.PI / 2;
-        } else if (!isRed && row >= 5) {
-          // 黑方棋子在下半部分（特殊情况），旋转 90 度
-          pieceMesh.rotation.y = Math.PI / 2;
+        let rotationY = 0;
+        
+        if (opponentTextDirection === 'down') {
+          // 对方棋子字体方向：向下
+          // 红方字体旋转90度，黑方字体旋转-90度
+          rotationY = isRed ? Math.PI / 2 : -Math.PI / 2;
         } else {
-          // 红方棋子在上半部分（特殊情况），旋转 -90 度
-          pieceMesh.rotation.y = -Math.PI / 2;
+          // 对方棋子字体方向：向上
+          // 红方字体旋转90度，黑方字体也旋转90度
+          rotationY = Math.PI / 2;
         }
+        
+        pieceMesh.rotation.y = rotationY;
         
         // 生成唯一编号：颜色 + 棋子名称 + 序号
         const pieceName = getPieceChineseName(piece);
@@ -663,8 +666,18 @@ function createPieceMesh(piece: PieceType, _row: number, _col: number): THREE.Me
   });
   const textMesh = new THREE.Mesh(textGeometry, textMaterial);
   textMesh.rotation.x = -Math.PI / 2; // 水平放置
-  // 文字贴图放在棋子顶部，相对于棋子底部
-  textMesh.position.y = height + 0.001; // 顶部在height位置
+  
+  // 修复文字贴图位置：根据棋子形状调整
+  if (currentPieceShape === 'cylinder') {
+    // 柱型：圆柱几何体中心在原点，高度从 -height/2 到 +height/2
+    // 所以顶部在 height/2 位置
+    textMesh.position.y = height / 2 + 0.001;
+  } else {
+    // 鼓型：使用 LatheGeometry，几何体从 y=0 开始到 y=height
+    // 所以顶部在 height 位置
+    textMesh.position.y = height + 0.001;
+  }
+  
   mesh.add(textMesh);
   
   return mesh;
@@ -788,15 +801,19 @@ function syncPiecesWithBoard() {
         
         // 设置文字朝向
         const isRed = piece > 0;
-        if (!isRed && row < 5) {
-          pieceMesh.rotation.y = -Math.PI / 2;
-        } else if (isRed && row >= 5) {
-          pieceMesh.rotation.y = Math.PI / 2;
-        } else if (!isRed && row >= 5) {
-          pieceMesh.rotation.y = Math.PI / 2;
+        let rotationY = 0;
+        
+        if (opponentTextDirection === 'down') {
+          // 对方棋子字体方向：向下
+          // 红方字体旋转90度，黑方字体旋转-90度
+          rotationY = isRed ? Math.PI / 2 : -Math.PI / 2;
         } else {
-          pieceMesh.rotation.y = -Math.PI / 2;
+          // 对方棋子字体方向：向上
+          // 红方字体旋转90度，黑方字体也旋转90度
+          rotationY = Math.PI / 2;
         }
+        
+        pieceMesh.rotation.y = rotationY;
         
         // 生成唯一编号
         const pieceName = getPieceChineseName(piece);

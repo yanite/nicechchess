@@ -20,6 +20,7 @@
 | 10 | config.rs 文件异常膨胀 | 🔴 严重 | ✅ 已修复 |
 | 11 | 窗口状态保存循环调用 | 🔴 严重 | ✅ 已修复 |
 | 12 | 配置管理架构优化 - 内存缓存 | 🟡 中等 | ✅ 已修复 |
+| 13 | 棋子字体漂浮和方向错误 | 🟡 中等 | ✅ 已修复 |
 
 ---
 
@@ -455,7 +456,7 @@ window.on_window_event(move |event| {
 
 使用 `Arc<Mutex<AppConfig>>` 在内存中维护配置副本：
 
-```rust
+``rust
 use std::sync::{Arc, Mutex};
 
 pub fn run() {
@@ -553,6 +554,85 @@ pub fn run() {
 - `Mutex<Option<T>>` 是正确的嵌套顺序
 - 必须先解包 `Option`，再锁定 `Mutex`
 - 注意作用域控制，避免死锁
+
+---
+
+### **Bug #13: 棋子字体漂浮和方向错误**
+
+**发现时间：** 2026-05-04  
+**影响范围：** `src/components/3d/ChessBoard3D.vue`  
+**现象：**
+- 棋子从鼓型改成柱型后，字体漂浮在棋子外面，离开棋子表面有距离
+- 字体方向不正确，没有根据配置正确旋转
+
+**根本原因：**
+1. **字体漂浮问题：**
+   - 柱型棋子使用 `CylinderGeometry`，几何体中心在原点，高度范围是 `-height/2` 到 `+height/2`
+   - 但文字贴图的 y 坐标设置为 `height + 0.001`，导致文字远离顶部表面
+   - 鼓型棋子使用 `LatheGeometry`，几何体从 `y=0` 开始到 `y=height`，所以原来的计算是正确的
+
+2. **字体方向问题：**
+   - 原代码根据棋子在棋盘的位置（上半部分/下半部分）决定旋转
+   - 应该根据配置的 `opponent_text_direction` 和棋子颜色来决定旋转角度
+
+**修复方案：**
+
+1. **修复字体位置：**
+``typescript
+// 修复前（错误）
+textMesh.position.y = height + 0.001; // 对所有形状都使用相同逻辑
+
+// 修复后（正确）
+if (currentPieceShape === 'cylinder') {
+  // 柱型：圆柱几何体中心在原点，顶部在 height/2 位置
+  textMesh.position.y = height / 2 + 0.001;
+} else {
+  // 鼓型：LatheGeometry 从 y=0 开始，顶部在 height 位置
+  textMesh.position.y = height + 0.001;
+}
+```
+
+2. **修复字体方向：**
+``typescript
+// 修复前（错误）
+// 根据棋子在棋盘的位置决定旋转
+if (!isRed && row < 5) {
+  pieceMesh.rotation.y = -Math.PI / 2;
+} else if (isRed && row >= 5) {
+  pieceMesh.rotation.y = Math.PI / 2;
+}
+// ... 更多条件判断
+
+// 修复后（正确）
+const isRed = piece > 0;
+let rotationY = 0;
+
+if (opponentTextDirection === 'down') {
+  // 对方棋子字体方向：向下
+  // 红方字体旋转90度，黑方字体旋转-90度
+  rotationY = isRed ? Math.PI / 2 : -Math.PI / 2;
+} else {
+  // 对方棋子字体方向：向上
+  // 红方字体旋转90度，黑方字体也旋转90度
+  rotationY = Math.PI / 2;
+}
+
+pieceMesh.rotation.y = rotationY;
+```
+
+3. **添加配置加载：**
+``typescript
+// 在 initScene 中加载配置
+opponentTextDirection = config.ui.opponent_text_direction || 'down';
+console.log('加载对方棋子字体方向配置:', opponentTextDirection);
+```
+
+**验证方法：**
+1. 启动应用，观察柱型棋子的文字是否紧贴顶部表面
+2. 修改配置文件中的 `opponent_text_direction` 为 `down` 或 `up`
+3. 重启应用，验证红黑双方棋子的文字方向是否正确旋转
+
+**相关提交：** （待提交）
 
 ---
 
