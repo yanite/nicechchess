@@ -50,16 +50,33 @@ function saveWindowStateDebounced() {
 async function restoreWindowState() {
   try {
     const saved = localStorage.getItem(WINDOW_STATE_KEY);
-    if (!saved) return;
+    if (!saved) {
+      console.log('未找到保存的窗口状态');
+      return;
+    }
     
     const state: WindowState = JSON.parse(saved);
+    console.log('读取到保存的窗口状态:', state);
+    
     const appWindow = getCurrentWindow();
     
-    // 设置窗口位置和大小
-    await appWindow.setPosition({ x: state.x, y: state.y });
-    await appWindow.setSize({ width: state.width, height: state.height });
+    // 设置窗口位置
+    try {
+      await appWindow.setPosition({ x: Math.round(state.x), y: Math.round(state.y) });
+      console.log('窗口位置已设置:', { x: state.x, y: state.y });
+    } catch (posError) {
+      console.error('设置窗口位置失败:', posError);
+    }
     
-    console.log('窗口状态已恢复:', state);
+    // 设置窗口大小
+    try {
+      await appWindow.setSize({ width: Math.round(state.width), height: Math.round(state.height) });
+      console.log('窗口大小已设置:', { width: state.width, height: state.height });
+    } catch (sizeError) {
+      console.error('设置窗口大小失败:', sizeError);
+    }
+    
+    console.log('窗口状态恢复完成');
   } catch (error) {
     console.error('恢复窗口状态失败:', error);
   }
