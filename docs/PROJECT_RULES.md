@@ -76,9 +76,18 @@ git push
 
 **执行任何 Rust 相关的命令前，必须先执行 `vcvars64.bat` 初始化 Visual Studio 编译环境，否则 Rust 会启动失败！**
 
-#### 操作步骤
+#### ⚠️ 重要说明
 
-1. **打开 CMD 或 Git Bash**
+**不要由 AI 自动执行 vcvars64.bat！** 
+
+原因：
+- 每次执行都会打开一个新的终端窗口
+- 用户需要手动在现有终端中执行此命令
+- AI 应该等待用户在正确的终端环境中执行完 vcvars64.bat 后再继续
+
+#### 用户操作步骤
+
+1. **打开 CMD 或 Git Bash**（在项目根目录）
 2. **执行 vcvars64.bat**（路径根据 Visual Studio 版本可能不同）：
    ```batch
    "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
