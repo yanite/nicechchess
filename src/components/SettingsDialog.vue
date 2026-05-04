@@ -274,7 +274,19 @@ async function loadSettings() {
 // 扫描可用的纹理目录
 async function scanAvailableTextures() {
   try {
+    console.log('开始扫描纹理目录...');
     const textures = await scanTextureDirectories();
+    console.log('Rust 返回的纹理列表:', textures);
+    
+    if (textures.length === 0) {
+      console.warn('未找到任何纹理目录，使用默认值');
+      availableTextures.value = [
+        { value: 'tx1', label: '纹理1 (tx1)' },
+        { value: 'tx2', label: '纹理2 (tx2)' },
+        { value: 'custom', label: '自定义纹理...' },
+      ];
+      return;
+    }
     
     availableTextures.value = textures.map(t => ({
       value: t,
@@ -284,12 +296,13 @@ async function scanAvailableTextures() {
     // 添加自定义选项
     availableTextures.value.push({ value: 'custom', label: '自定义纹理...' });
     
-    console.log('可用纹理:', availableTextures.value);
+    console.log('可用纹理列表:', availableTextures.value);
   } catch (error) {
     console.error('扫描纹理失败:', error);
     // 降级到默认列表
     availableTextures.value = [
       { value: 'tx1', label: '纹理1 (tx1)' },
+      { value: 'tx2', label: '纹理2 (tx2)' },
       { value: 'custom', label: '自定义纹理...' },
     ];
   }
@@ -493,8 +506,6 @@ function close() {
 // 组件挂载时加载配置
 onMounted(() => {
   loadSettings();
-  // 扫描可用纹理目录
-  scanAvailableTextures();
 });
 </script>
 
