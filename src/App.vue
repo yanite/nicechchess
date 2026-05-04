@@ -60,23 +60,31 @@ async function restoreWindowState() {
     
     const appWindow = getCurrentWindow();
     
-    // 设置窗口位置
+    // 设置窗口位置（使用Tauri v2 API）
     try {
       await appWindow.setPosition({ x: Math.round(state.x), y: Math.round(state.y) });
-      console.log('窗口位置已设置:', { x: state.x, y: state.y });
+      console.log('✓ 窗口位置已设置:', { x: state.x, y: state.y });
+      
+      // 验证位置是否设置成功
+      const currentPos = await appWindow.outerPosition();
+      console.log('当前窗口位置:', { x: currentPos.x, y: currentPos.y });
     } catch (posError) {
-      console.error('设置窗口位置失败:', posError);
+      console.error('✗ 设置窗口位置失败:', posError);
     }
     
-    // 设置窗口大小
+    // 设置窗口大小（使用Tauri v2 API）
     try {
       await appWindow.setSize({ width: Math.round(state.width), height: Math.round(state.height) });
-      console.log('窗口大小已设置:', { width: state.width, height: state.height });
+      console.log('✓ 窗口大小已设置:', { width: state.width, height: state.height });
+      
+      // 验证大小是否设置成功
+      const currentSize = await appWindow.outerSize();
+      console.log('当前窗口大小:', { width: currentSize.width, height: currentSize.height });
     } catch (sizeError) {
-      console.error('设置窗口大小失败:', sizeError);
+      console.error('✗ 设置窗口大小失败:', sizeError);
     }
     
-    console.log('窗口状态恢复完成');
+    console.log('=== 窗口状态恢复完成 ===');
   } catch (error) {
     console.error('恢复窗口状态失败:', error);
   }
