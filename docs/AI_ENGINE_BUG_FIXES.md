@@ -18,6 +18,7 @@
 | 8 | AI 着法缺少规则验证 | 🟡 中等 | ✅ 已修复 |
 | 9 | 窗口移动导致频繁重新编译 | 🔴 严重 | ✅ 已修复 |
 | 10 | config.rs 文件异常膨胀 | 🔴 严重 | ✅ 已修复 |
+| 11 | 窗口状态保存循环调用 | 🔴 严重 | ✅ 已修复 |
 
 ---
 
@@ -96,7 +97,7 @@ error: unexpected closing delimiter: `}`
 
 **修复方案：**
 添加调试日志打印当前工作目录，确认路径正确性：
-```rust
+``rust
 println!("当前工作目录: {:?}", std::env::current_dir());
 ```
 
@@ -357,6 +358,79 @@ git checkout HEAD -- src-tauri/src/config.rs
 - ⚠️ 定期检查关键文件的大小和行数，防止意外修改
 - ✅ 使用Git跟踪文件变化，及时发现异常
 - ✅ 遇到奇怪的编译错误时，先检查文件是否被意外修改
+
+---
+
+### **Bug #11: 窗口状态保存循环调用**
+
+**发现时间：** 2026-05-04  
+**影响范围：** `src-tauri/src/lib.rs`  
+**现象描述：**
+```
+配置加载成功: "config.yaml"
+配置已保存: "config.yaml"
+配置加载成功: "config.yaml"
+配置加载成功: "config.yaml"
+配置已保存: "config.yaml"
+配置已保存: "config.yaml"
+...
+```
+每次移动窗口都会在日志中看到多次"配置加载成功"和"配置已保存"交替出现。
+
+**根本原因：**
+1. 窗口移动时会连续触发多个 `Moved` 事件
+2. 每个事件都会 spawn 一个新的线程，延迟2秒后执行保存
+3. 如果用户在2秒内多次移动窗口，会产生多个并发的保存任务
+4. 这些任务同时执行，导致频繁的加载和保存操作
+
+**修复方案：**
+
+使用原子标志位 `AtomicBool` 防止并发保存：
+
+``rust
+use std::sync::atomic::{AtomicBool, Ordering};
+static SAVE_PENDING: AtomicBool = AtomicBool::new(false);
+
+window.on_window_event(move |event| {
+    match event {
+        tauri::WindowEvent::Moved(_) | tauri::WindowEvent::Resized(_) => {
+            // 如果已有保存任务在等待，则跳过
+            if SAVE_PENDING.swap(true, Ordering::SeqCst) {
+                return;
+            }
+            
+            let win = window_clone.clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_millis(2000));
+                
+                // 执行保存逻辑...
+                
+                // 重置标志，允许下次保存
+                SAVE_PENDING.store(false, Ordering::SeqCst);
+            });
+        }
+        _ => {}
+    }
+});
+```
+
+**关键改进：**
+1. ✅ 使用 `AtomicBool` 确保线程安全
+2. ✅ `swap(true)` 原子性地检查并设置标志，避免竞态条件
+3. ✅ 保存完成后重置标志，允许下一次保存
+4. ✅ 增加详细的日志输出，显示实际保存的窗口状态
+
+**验证方法：**
+1. 启动应用并快速多次移动窗口
+2. 观察日志，应该只看到一次"窗口状态已保存"（每2秒最多一次）
+3. 不再出现频繁的交替加载/保存日志
+
+**相关提交：** `19db837`
+
+**经验教训：**
+- ⚠️ 异步任务中必须考虑并发控制
+- ✅ 使用原子类型处理跨线程的状态标志
+- ✅ 防抖机制不仅要延迟执行，还要防止重复触发
 
 ---
 
