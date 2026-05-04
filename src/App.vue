@@ -281,6 +281,11 @@ function undoMove() {
   chessStore.undoMove();
 }
 
+// 重做（下一步）
+function redoMove() {
+  chessStore.redoMove();
+}
+
 // 打开设置对话框
 function openSettings() {
   showSettings.value = true;
@@ -300,6 +305,7 @@ function onSettingsChanged(settings: any) {
       <div class="menu-items">
         <button @click="resetGame">新游戏</button>
         <button @click="undoMove" :disabled="!chessStore.canUndo">悔棋</button>
+        <button @click="redoMove" :disabled="!chessStore.canRedo">重做</button>
         <button @click="openSettings">选项</button>
         <span class="game-info">
           当前: {{ currentPlayerText }} | 
