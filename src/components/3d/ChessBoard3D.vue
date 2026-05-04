@@ -45,6 +45,10 @@ let raycaster: THREE.Raycaster;
 let mouse: THREE.Vector2;
 let lineMaterials: LineMaterial[] = []; // 存储所有 LineMaterial，用于更新分辨率
 
+// 默认相机位置和视角（用于Ctrl+H重置）
+const DEFAULT_CAMERA_POSITION = new THREE.Vector3(0, 15, 0);
+const DEFAULT_CAMERA_TARGET = new THREE.Vector3(0, 0, 0);
+
 // 拖动相关变量
 let draggedPiece: THREE.Mesh | null = null; // 当前拖动的棋子
 let isDragging = false; // 是否正在拖动
@@ -635,7 +639,7 @@ function getPieceChineseName(piece: PieceType): string {
 }
 
 /**
- * 鼠标按下事件 - 开始拖动棋子
+ * 鼠标按下事件 - 开始拖动棋子或启用旋转
  */
 function onMouseDown(event: MouseEvent) {
   if (!container.value) return;
@@ -647,10 +651,12 @@ function onMouseDown(event: MouseEvent) {
 
   // 射线检测
   raycaster.setFromCamera(mouse, camera);
-  const intersects = raycaster.intersectObjects(piecesGroup.children);
+  
+  // 首先检测是否点击到棋子
+  const pieceIntersects = raycaster.intersectObjects(piecesGroup.children);
 
-  if (intersects.length > 0) {
-    const selectedObject = intersects[0].object as THREE.Mesh;
+  if (pieceIntersects.length > 0) {
+    const selectedObject = pieceIntersects[0].object as THREE.Mesh;
     
     // 检查是否是死子（被吃掉的棋子不能再移动）
     if ((selectedObject as any).userData.isCaptured) {
@@ -676,7 +682,22 @@ function onMouseDown(event: MouseEvent) {
       
       // 抬起棋子
       selectedObject.position.y = 0.8;
+      
+      // 禁用旋转控制器，避免冲突
+      controls.enabled = false;
+      return;
     }
+  }
+  
+  // 如果没有点击到棋子，检测是否点击到棋盘
+  const boardIntersects = raycaster.intersectObjects(boardGroup.children);
+  
+  if (boardIntersects.length > 0) {
+    // 点击到棋盘，禁用旋转
+    controls.enabled = false;
+  } else {
+    // 点击到棋盘外面，启用旋转摄像头
+    controls.enabled = true;
   }
 }
 
@@ -1171,6 +1192,41 @@ function onWindowResize() {
 }
 
 /**
+ * 重置相机视角到默认位置（棋盘面向视口）
+ */
+function resetCameraView() {
+  console.log('重置相机视角到默认位置');
+  
+  // 平滑过渡到默认位置
+  const startPosition = camera.position.clone();
+  const targetPosition = DEFAULT_CAMERA_POSITION.clone();
+  
+  // 简单的动画效果（10帧完成）
+  let frame = 0;
+  const totalFrames = 10;
+  
+  function animateReset() {
+    frame++;
+    const t = frame / totalFrames;
+    
+    // 线性插值
+    camera.position.lerpVectors(startPosition, targetPosition, t);
+    camera.lookAt(DEFAULT_CAMERA_TARGET);
+    
+    if (frame < totalFrames) {
+      requestAnimationFrame(animateReset);
+    } else {
+      // 确保最终位置准确
+      camera.position.copy(targetPosition);
+      camera.lookAt(DEFAULT_CAMERA_TARGET);
+      console.log('相机视角已重置');
+    }
+  }
+  
+  animateReset();
+}
+
+/**
  * 隐藏将军/绝杀提示
  */
 function hideCheckAlert() {
@@ -1201,6 +1257,12 @@ onMounted(() => {
   // 添加键盘事件监听，按住 Ctrl 键时启用摄像头旋转
   const handleKeyDown = (event: KeyboardEvent) => {
     if (event.ctrlKey && controls) {
+      // 检查是否是 Ctrl+H 组合键（重置相机视角）
+      if (event.key.toLowerCase() === 'h') {
+        event.preventDefault(); // 阻止默认行为
+        resetCameraView();
+        return;
+      }
       controls.enabled = true;
     }
   };
