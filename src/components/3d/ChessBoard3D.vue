@@ -1077,9 +1077,10 @@ function executeMove(fromRow: number, fromCol: number, toRow: number, toCol: num
   
   const startX = -((BOARD_WIDTH - 1) * CELL_SIZE) / 2;
   const startZ = -((BOARD_HEIGHT - 1) * CELL_SIZE) / 2;
+  const height = CELL_SIZE * 0.35; // 棋子高度
   draggedPiece.position.x = startX + toCol * CELL_SIZE;
   draggedPiece.position.z = startZ + toRow * CELL_SIZE;
-  draggedPiece.position.y = 0;
+  draggedPiece.position.y = 0.01 + height / 2; // 放在棋盘线上方
   
   // 4. 更新棋盘数据
   chessStore.movePiece(fromRow, fromCol, toRow, toCol);
