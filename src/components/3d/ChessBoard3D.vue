@@ -477,10 +477,11 @@ function createPieces() {
       const piece = board[row][col];
       if (piece !== PIECES.EMPTY) {
         const pieceMesh = createPieceMesh(piece, row, col);
-        // 棋子应该放在棋盘线的交叉点上
+        
+        // 设置位置（x和z，y坐标已在createPieceMesh中设置）
         pieceMesh.position.x = startX + col * CELL_SIZE;
         pieceMesh.position.z = startZ + row * CELL_SIZE;
-        pieceMesh.position.y = 0; // 正常位置
+        // y坐标由createPieceMesh内部设置为 0.01 + height / 2
         
         // 设置棋子文字朝向：都朝向楚河汉界（棋盘中心）
         // 黑方在上方（row 0-4），文字需要旋转 -90 度
@@ -638,7 +639,7 @@ function createPieceMesh(piece: PieceType, _row: number, _col: number): THREE.Me
   });
   
   const mesh = new THREE.Mesh(geometry, sideMaterial);
-  mesh.position.y = height / 2; // 向上偏移半个厚度，避免镶嵌到棋盘
+  mesh.position.y = 0.01 + height / 2; // 放在棋盘线上方（y=0.01），加上半个厚度
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   
@@ -1059,7 +1060,7 @@ function executeMove(fromRow: number, fromCol: number, toRow: number, toCol: num
         (targetMesh as THREE.Mesh).position.z = startZ + offsetZ;
       }
       
-      (targetMesh as THREE.Mesh).position.y = 0;
+      (targetMesh as THREE.Mesh).position.y = 0.01; // 放在棋盘线上方
     }
   }
   
@@ -1362,12 +1363,13 @@ function displayCheckmateAlert() {
  */
 function resetPiecePosition(pieceMesh: THREE.Mesh) {
   const { row, col } = (pieceMesh as any).userData;
+  const height = CELL_SIZE * 0.35; // 棋子高度
   const startX = -((BOARD_WIDTH - 1) * CELL_SIZE) / 2;
   const startZ = -((BOARD_HEIGHT - 1) * CELL_SIZE) / 2;
   
   pieceMesh.position.x = startX + col * CELL_SIZE;
   pieceMesh.position.z = startZ + row * CELL_SIZE;
-  pieceMesh.position.y = 0;
+  pieceMesh.position.y = 0.01 + height / 2; // 放在棋盘线上方
 }
 
 /**
