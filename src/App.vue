@@ -246,28 +246,54 @@ const currentPlayerText = computed(() => {
 
 // 计算着法历史显示（按回合分组）
 const moveHistoryText = computed(() => {
-  const rounds: Array<{ num: number; red?: string; black?: string }> = [];
+  const rounds: Array<{ 
+    num: number; 
+    red?: string; 
+    black?: string;
+    redIndex?: number;
+    blackIndex?: number;
+  }> = [];
   
   chessStore.moveHistory.forEach((move, index) => {
     const roundNum = Math.floor(index / 2) + 1;
     
     if (index % 2 === 0) {
       // 红方着法
-      rounds.push({ num: roundNum, red: move.chineseNotation });
+      rounds.push({ num: roundNum, red: move.chineseNotation, redIndex: index });
     } else {
       // 黑方着法，添加到上一个回合
       if (rounds.length > 0) {
         rounds[rounds.length - 1].black = move.chineseNotation;
+        rounds[rounds.length - 1].blackIndex = index;
       }
     }
   });
   
   return rounds.map(round => {
-    if (round.black) {
-      return `${round.num}. ${round.red} ${round.black}`;
-    } else {
-      return `${round.num}. ${round.red}`;
+    let text = '';
+    let isRedUndone = false;
+    let isBlackUndone = false;
+    
+    // 判断着法是否已被撤销（索引大于currentMoveIndex）
+    if (round.redIndex !== undefined && round.redIndex > chessStore.currentMoveIndex) {
+      isRedUndone = true;
     }
+    if (round.blackIndex !== undefined && round.blackIndex > chessStore.currentMoveIndex) {
+      isBlackUndone = true;
+    }
+    
+    if (round.black) {
+      text = `${round.num}. ${round.red} ${round.black}`;
+    } else {
+      text = `${round.num}. ${round.red}`;
+    }
+    
+    return {
+      text,
+      isRedUndone,
+      isBlackUndone,
+      hasBoth: !!round.black
+    };
   });
 });
 
@@ -328,7 +354,14 @@ function onSettingsChanged(settings: any) {
         <h3>着法记录</h3>
         <div class="move-list">
           <div v-for="(move, index) in moveHistoryText" :key="index" class="move-item">
-            {{ move }}
+            <span v-if="!move.isRedUndone && !move.isBlackUndone">{{ move.text }}</span>
+            <span v-else-if="move.isRedUndone && move.isBlackUndone" class="undone-move">{{ move.text }}</span>
+            <span v-else-if="move.isRedUndone" class="partially-undone-move">
+              {{ move.text }}
+            </span>
+            <span v-else class="partially-undone-move">
+              {{ move.text }}
+            </span>
           </div>
           <div v-if="chessStore.moveHistory.length === 0" class="empty-hint">
             暂无着法
@@ -469,6 +502,18 @@ export default {
   border-radius: 3px;
   font-size: 13px;
   font-family: monospace;
+}
+
+/* 已撤销的着法（完全灰色） */
+.undone-move {
+  color: #bdc3c7;
+  text-decoration: line-through;
+}
+
+/* 部分撤销的着法（半透明） */
+.partially-undone-move {
+  color: #95a5a6;
+  opacity: 0.6;
 }
 
 .empty-hint {
