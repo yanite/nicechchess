@@ -18,6 +18,7 @@ import {
   initBoard,
   getPieceColor
 } from './constants';
+import { isValidMove } from './rules';
 
 // ==================== 基础转换函数 ====================
 
@@ -550,8 +551,10 @@ export function resolveMovePosition(
       continue;  // 尝试下一个候选
     }
     
-    // TODO: 未来可以添加规则验证（是否可以移动、是否会送将等）
-    // if (!isValidMove(board, fromRow, fromCol, toRow, toCol)) continue;
+    // 验证移动是否合法（包括基础规则、吃子规则、叫将规则、高级规则）
+    if (!isValidMove(board, fromRow, fromCol, toRow, toCol)) {
+      continue;  // 尝试下一个候选
+    }
     
     // 返回第一个合法的移动
     return [fromRow, fromCol, toRow, toCol];
