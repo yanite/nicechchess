@@ -452,6 +452,7 @@ export function resolveMovePosition(
   }
   
   if (candidates.length === 0) {
+    console.warn(`在列 ${fromCol} 未找到棋子类型 ${pieceType}`);
     return null;
   }
   

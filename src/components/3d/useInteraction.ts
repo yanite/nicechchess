@@ -30,27 +30,18 @@ export function useInteraction(
   function onMouseDown(event: MouseEvent) {
     if (!container) return;
 
-    console.log('=== onMouseDown 触发 ===');
-
     // ✅ 第零层：配置未就绪时禁止所有操作
     if (!isConfigReady()) {
-      console.log('⚠️ 配置尚未加载完成，禁止操作');
       return;
     }
 
-    // 调试日志：检查 AI 思考状态
-    const aiThinking = isAIThinking();
-    console.log('onMouseDown - AI思考状态:', aiThinking);
-
     // ✅ 第一层：AI 思考时完全禁用
-    if (aiThinking) {
-      console.log('❌ AI 正在思考中，禁止操作');
+    if (isAIThinking()) {
       return;
     }
 
     // 如果按下了修饰键（Alt/Ctrl/Shift），不处理棋子移动，交给OrbitControls处理
     if (event.altKey || event.ctrlKey || event.shiftKey) {
-      console.log('⚠️ 检测到修饰键，交给 OrbitControls 处理');
       return; // 让OrbitControls处理相机操作
     }
 
@@ -58,21 +49,13 @@ export function useInteraction(
     const blackIsAI = chessStore.blackPlayer.useAI;
     const redIsAI = chessStore.redPlayer.useAI;
     
-    console.log('玩家配置:', {
-      blackIsAI,
-      redIsAI,
-      currentPlayer: chessStore.currentPlayer
-    });
-    
     if (blackIsAI && redIsAI) {
-      console.log('❌ 双方都是AI，禁止手动操作');
       return;
     }
     
-    // ✅ 第二层：当前玩家是 AI 时禁用
+    // ✅ 第二层：非研究模式下，当前玩家是 AI 时禁用
     const currentIsAI = chessStore.currentPlayer === 'black' ? blackIsAI : redIsAI;
-    if (currentIsAI) {
-      console.log(`❌ 当前玩家 (${chessStore.currentPlayer}) 是AI，禁止手动操作`);
+    if (!chessStore.isStudyMode && currentIsAI) {
       return;
     }
 
@@ -106,16 +89,8 @@ export function useInteraction(
         const { piece } = (selectedObject as any).userData;
         const pieceColor = piece > 0 ? 'red' : 'black';
         
-        console.log('点击检测:', {
-          pieceColor,
-          currentPlayer: chessStore.currentPlayer,
-          isCurrentPlayer: pieceColor === chessStore.currentPlayer
-        });
-        
-        // 阵营限制：只能点击己方棋子
-        if (pieceColor !== chessStore.currentPlayer) {
-          console.log(`❌ 不能点击对方棋子 (${pieceColor})`);
-          
+        // 研究模式：可以点击任何棋子；普通模式：只能点击己方棋子
+        if (!chessStore.isStudyMode && pieceColor !== chessStore.currentPlayer) {
           // 可选：添加视觉反馈（如闪烁效果）
           const material = (selectedObject as THREE.Mesh).material;
           if (material instanceof THREE.MeshStandardMaterial) {

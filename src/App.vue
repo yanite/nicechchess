@@ -49,7 +49,6 @@ async function validateAndFixWindowState(state: WindowState): Promise<WindowStat
     if (currentMonitor) {
       screenWidth = currentMonitor.size.width;
       screenHeight = currentMonitor.size.height;
-      console.log('检测到屏幕尺寸:', { width: screenWidth, height: screenHeight });
     }
   } catch (error) {
     console.warn('无法获取屏幕信息，使用默认值:', error);
@@ -112,12 +111,6 @@ async function validateAndFixWindowState(state: WindowState): Promise<WindowStat
     needsFix = true;
   }
   
-  // if (needsFix) {
-  //   console.log('窗口状态已修正:', fixedState);
-  // } else {
-  //   console.log('窗口状态验证通过');
-  // }
-  
   return fixedState;
 }
 
@@ -142,7 +135,6 @@ function saveWindowStateDebounced() {
       };
       
       localStorage.setItem(WINDOW_STATE_KEY, JSON.stringify(state));
-      console.log('窗口状态已保存:', state);
     } catch (error) {
       console.error('保存窗口状态失败:', error);
     }
@@ -154,12 +146,10 @@ async function restoreWindowState() {
   try {
     const saved = localStorage.getItem(WINDOW_STATE_KEY);
     if (!saved) {
-      console.log('未找到保存的窗口状态，使用默认值');
       return;
     }
     
     let state: WindowState = JSON.parse(saved);
-    // console.log('读取到保存的窗口状态:', state);
     
     // 验证并修正窗口状态
     state = await validateAndFixWindowState(state);
@@ -173,13 +163,8 @@ async function restoreWindowState() {
         x: Math.round(state.x), 
         y: Math.round(state.y) 
       });
-      // console.log('✓ 窗口位置已设置:', { x: state.x, y: state.y });
-      
-      // 验证位置是否设置成功
-      // const currentPos = await appWindow.outerPosition();
-      // console.log('当前窗口位置:', { x: currentPos.x, y: currentPos.y });
     } catch (posError) {
-      console.error('✗ 设置窗口位置失败:', posError);
+      console.error('设置窗口位置失败:', posError);
     }
     
     // 设置窗口大小（使用Tauri v2 PhysicalSize）
@@ -189,16 +174,9 @@ async function restoreWindowState() {
         width: Math.round(state.width), 
         height: Math.round(state.height) 
       });
-      // console.log('✓ 窗口大小已设置:', { width: state.width, height: state.height });
-      
-      // 验证大小是否设置成功
-      // const currentSize = await appWindow.outerSize();
-      // console.log('当前窗口大小:', { width: currentSize.width, height: currentSize.height });
     } catch (sizeError) {
-      console.error('✗ 设置窗口大小失败:', sizeError);
+      console.error('设置窗口大小失败:', sizeError);
     }
-    
-    console.log('=== 窗口状态恢复完成 ===');
   } catch (error) {
     console.error('恢复窗口状态失败:', error);
   }
@@ -206,37 +184,29 @@ async function restoreWindowState() {
 
 // 组件挂载时恢复窗口状态并监听事件
 onMounted(async () => {
-  console.log('App.vue onMounted - 开始初始化窗口监听');
-  
   // 恢复窗口状态
   await restoreWindowState();
   
   // 监听窗口移动和调整大小事件
   const appWindow = getCurrentWindow();
-  // console.log('获取到appWindow对象:', appWindow);
   
   let unlistenMove: (() => void) | null = null;
   let unlistenResize: (() => void) | null = null;
   
   try {
-    unlistenMove = await appWindow.onMoved((event) => {
-      // console.log('窗口移动事件触发:', event.payload);
+    unlistenMove = await appWindow.onMoved(() => {
       saveWindowStateDebounced();
     });
-    // console.log('窗口移动监听器已注册');
     
-    unlistenResize = await appWindow.onResized((event) => {
-      // console.log('窗口调整大小事件触发:', event.payload);
+    unlistenResize = await appWindow.onResized(() => {
       saveWindowStateDebounced();
     });
-    // console.log('窗口调整大小监听器已注册');
   } catch (error) {
     console.error('注册窗口监听器失败:', error);
   }
   
   // 监听页面刷新/关闭事件，停止引擎
   window.addEventListener('beforeunload', async () => {
-    console.log('页面即将刷新或关闭，停止AI引擎...');
     try {
       const { stopEngine } = await import('./services/engineService');
       await stopEngine();
@@ -249,11 +219,9 @@ onMounted(async () => {
   onUnmounted(() => {
     if (unlistenMove) {
       unlistenMove();
-      console.log('窗口移动监听器已清理');
     }
     if (unlistenResize) {
       unlistenResize();
-      console.log('窗口调整大小监听器已清理');
     }
   });
 });
@@ -262,21 +230,6 @@ onMounted(async () => {
 const currentPlayerText = computed(() => {
   return chessStore.currentPlayer === 'red' ? '红方' : '黑方';
 });
-
-/**
- * 将着法中的中文数字转换为阿拉伯数字（用于黑方）
- */
-function convertToArabicNumbers(notation: string): string {
-  const chineseNumbers = ['一', '二', '三', '四', '五', '六', '七', '八', '九'];
-  const arabicNumbers = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
-  
-  let result = notation;
-  for (let i = 0; i < chineseNumbers.length; i++) {
-    result = result.replace(new RegExp(chineseNumbers[i], 'g'), arabicNumbers[i]);
-  }
-  
-  return result;
-}
 
 // 计算着法历史显示（按回合分组）
 const moveHistoryText = computed(() => {
@@ -291,17 +244,16 @@ const moveHistoryText = computed(() => {
   chessStore.moveHistory.forEach((move, index) => {
     const roundNum = Math.floor(index / 2) + 1;
     
-    // 转换着法格式：红方保持中文数字，黑方转换为阿拉伯数字
-    let displayNotation = move.chineseNotation;
+    // store 已经正确处理了数字格式：红方用中文数字，黑方用阿拉伯数字
+    const displayNotation = move.chineseNotation;
     
     if (index % 2 === 0) {
-      // 红方着法：保持原样（已经是中文数字）
+      // 红方着法
       rounds.push({ num: roundNum, red: displayNotation, redIndex: index });
     } else {
-      // 黑方着法：将中文数字转换为阿拉伯数字
-      const arabicNotation = convertToArabicNumbers(displayNotation);
+      // 黑方着法
       if (rounds.length > 0) {
-        rounds[rounds.length - 1].black = arabicNotation;
+        rounds[rounds.length - 1].black = displayNotation;
         rounds[rounds.length - 1].blackIndex = index;
       }
     }
@@ -335,14 +287,17 @@ const moveHistoryText = computed(() => {
 /**
  * 点击着法时，跳转到该着法位置
  */
-function jumpToMove(moveIndex: number | undefined) {
+async function jumpToMove(moveIndex: number | undefined) {
   if (moveIndex === undefined) return;
   
   // 调用 store 的方法跳转到指定着法
   chessStore.jumpToMove(moveIndex);
   
-  // 同步 3D 棋盘状态
-  if (boardRef.value && boardRef.value.syncBoardState) {
+  // 同步 3D 棋盘状态（带动画）
+  if (boardRef.value && boardRef.value.animateSyncBoardState) {
+    await boardRef.value.animateSyncBoardState();
+  } else if (boardRef.value && boardRef.value.syncBoardState) {
+    // 降级方案：如果没有动画版本，使用普通同步
     boardRef.value.syncBoardState();
   }
 }
@@ -352,14 +307,28 @@ function resetGame() {
   chessStore.resetGame();
 }
 
-// 悔棋
-function undoMove() {
+// 悔棋（上一步）
+async function undoMove() {
   chessStore.undoMove();
+  
+  // 同步 3D 棋盘状态（带动画）
+  if (boardRef.value && boardRef.value.animateSyncBoardState) {
+    await boardRef.value.animateSyncBoardState();
+  } else if (boardRef.value && boardRef.value.syncBoardState) {
+    boardRef.value.syncBoardState();
+  }
 }
 
 // 重做（下一步）
-function redoMove() {
+async function redoMove() {
   chessStore.redoMove();
+  
+  // 同步 3D 棋盘状态（带动画）
+  if (boardRef.value && boardRef.value.animateSyncBoardState) {
+    await boardRef.value.animateSyncBoardState();
+  } else if (boardRef.value && boardRef.value.syncBoardState) {
+    boardRef.value.syncBoardState();
+  }
 }
 
 // 打开设置对话框
@@ -403,10 +372,31 @@ function openNotationDialog() {
   showNotationDialog.value = true;
 }
 
+// 处理棋谱导入完成
+async function handleNotationImported() {
+  // 停止AI引擎
+  try {
+    const { stopEngine } = await import('./services/engineService');
+    await stopEngine();
+  } catch (error) {
+    console.error('停止AI引擎失败:', error);
+  }
+}
+
+// 触发AI走一步
+function triggerAIMove() {
+  if (boardRef.value && boardRef.value.triggerAIMove) {
+    boardRef.value.triggerAIMove();
+  }
+}
+
+// 退出研究模式
+function exitStudyMode() {
+  chessStore.isStudyMode = false;
+}
+
 // 处理新游戏确认
 function handleNewGame(config: NewGameConfig) {
-  console.log('新开局配置:', config);
-  
   // 设置玩家配置
   chessStore.setPlayers(config.blackPlayer, config.redPlayer);
   
@@ -415,10 +405,8 @@ function handleNewGame(config: NewGameConfig) {
   
   // 如果红方是AI，延迟触发AI行棋（红方先手）
   if (config.redPlayer.useAI) {
-    console.log('红方使用AI，等级:', config.redPlayer.aiLevel);
     setTimeout(() => {
       // ChessBoard3D组件会自动检测并触发AI
-      console.log('触发红方AI行棋');
     }, 1000);
   }
 }
@@ -433,8 +421,14 @@ function handleNewGame(config: NewGameConfig) {
         <button @click="openNewGameDialog">新游戏</button>
         <button @click="undoMove" :disabled="!chessStore.canUndo">悔棋</button>
         <button @click="redoMove" :disabled="!chessStore.canRedo">重做</button>
+        <button @click="triggerAIMove">AI走一步</button>
         <button @click="openNotationDialog">棋谱</button>
         <button @click="openSettings">选项</button>
+        <!-- 研究模式指示和退出按钮 -->
+        <span v-if="chessStore.isStudyMode" class="study-mode-indicator">
+          🔍 研究模式
+          <button @click="exitStudyMode" class="exit-study-btn">退出</button>
+        </span>
         <span class="game-info">
           当前: {{ currentPlayerText }} | 
           FEN: {{ chessStore.fen.substring(0, 30) }}...
@@ -461,6 +455,7 @@ function handleNewGame(config: NewGameConfig) {
       :visible="showNotationDialog"
       @update:visible="showNotationDialog = $event"
       @close="showNotationDialog = false"
+      @imported="handleNotationImported"
     />
 
     <!-- 主内容区 -->
@@ -702,11 +697,34 @@ export default {
   background-color: rgba(243, 156, 18, 0.1);
 }
 
-.empty-hint {
-  color: #95a5a6;
-  font-style: italic;
-  text-align: center;
-  padding: 20px;
+/* 研究模式指示器 */
+.study-mode-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  background-color: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 4px;
+  color: #856404;
+  font-weight: bold;
+  font-size: 13px;
+  margin-left: 10px;
+}
+
+.exit-study-btn {
+  padding: 2px 8px;
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background-color 0.2s;
+}
+
+.exit-study-btn:hover {
+  background-color: #c82333;
 }
 
 /* 棋盘容器 */

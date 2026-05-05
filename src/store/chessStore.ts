@@ -54,6 +54,7 @@ export interface GameState {
   selectedPiece: [number, number] | null;  // 当前选中的棋子
   gameStatus: 'playing' | 'paused' | 'finished';  // 游戏状态
   winner: 'red' | 'black' | null;  // 获胜方
+  isStudyMode: boolean;            // 研究模式（导入棋谱后启用，不记录着法）
   redTime: number;  // 红方剩余时间（秒）
   blackTime: number;  // 黑方剩余时间（秒）
   blackPlayer: PlayerConfig;  // 黑方玩家配置
@@ -70,6 +71,7 @@ export const useChessStore = defineStore('chess', () => {
   const selectedPiece = ref<[number, number] | null>(null);
   const gameStatus = ref<'playing' | 'paused' | 'finished'>('playing');
   const winner = ref<'red' | 'black' | null>(null);
+  const isStudyMode = ref<boolean>(false);  // 研究模式（导入棋谱后启用）
   const redTime = ref(600);  // 默认每方 10 分钟
   const blackTime = ref(600);
   
@@ -148,26 +150,29 @@ export const useChessStore = defineStore('chess', () => {
     board.value[toRow][toCol] = piece;
     board.value[fromRow][fromCol] = PIECES.EMPTY;
     
-    // 记录着法
-    const uci = `${boardToUCI(fromRow, fromCol)}${boardToUCI(toRow, toCol)}`;
-    const chineseNotation = generateChineseNotation(board.value, fromRow, fromCol, toRow, toCol, piece);
-    const moveRecord: MoveRecord = {
-      from: [fromRow, fromCol],
-      to: [toRow, toCol],
-      piece,
-      captured: captured !== PIECES.EMPTY ? captured : undefined,
-      uci,
-      chineseNotation,
-      timestamp: Date.now(),
-    };
-    
-    // 如果在历史记录中间位置移动新棋，删除后续所有记录
-    if (currentMoveIndex.value < moveHistory.value.length - 1) {
-      moveHistory.value = moveHistory.value.slice(0, currentMoveIndex.value + 1);
+    // 研究模式下不记录着法
+    if (!isStudyMode.value) {
+      // 记录着法
+      const uci = `${boardToUCI(fromRow, fromCol)}${boardToUCI(toRow, toCol)}`;
+      const chineseNotation = generateChineseNotation(board.value, fromRow, fromCol, toRow, toCol, piece);
+      const moveRecord: MoveRecord = {
+        from: [fromRow, fromCol],
+        to: [toRow, toCol],
+        piece,
+        captured: captured !== PIECES.EMPTY ? captured : undefined,
+        uci,
+        chineseNotation,
+        timestamp: Date.now(),
+      };
+      
+      // 如果在历史记录中间位置移动新棋，删除后续所有记录
+      if (currentMoveIndex.value < moveHistory.value.length - 1) {
+        moveHistory.value = moveHistory.value.slice(0, currentMoveIndex.value + 1);
+      }
+      
+      moveHistory.value.push(moveRecord);
+      currentMoveIndex.value = moveHistory.value.length - 1;
     }
-    
-    moveHistory.value.push(moveRecord);
-    currentMoveIndex.value = moveHistory.value.length - 1;
     
     // 切换行棋方
     currentPlayer.value = currentPlayer.value === 'red' ? 'black' : 'red';
@@ -272,6 +277,7 @@ export const useChessStore = defineStore('chess', () => {
     selectedPiece.value = null;
     gameStatus.value = 'playing';
     winner.value = null;
+    isStudyMode.value = false;  // 新游戏时退出研究模式
     redTime.value = 600;
     blackTime.value = 600;
   }
@@ -476,6 +482,10 @@ export const useChessStore = defineStore('chess', () => {
         );
       }
       
+      // 导入成功后进入研究模式
+      isStudyMode.value = true;
+      console.log('已启用研究模式，不再自动记录着法');
+      
       return true;  // 只要格式正确就返回成功
     } catch (error) {
       console.error('导入棋谱时发生错误:', error);
@@ -530,6 +540,7 @@ export const useChessStore = defineStore('chess', () => {
     selectedPiece,
     gameStatus,
     winner,
+    isStudyMode,  // 研究模式状态
     redTime,
     blackTime,
     blackPlayer,

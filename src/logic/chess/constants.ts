@@ -162,13 +162,19 @@ export function UCIToMove(uciMove: string): [number, number, number, number] {
 }
 
 /**
- * 将棋盘坐标转换为中文数字（用于着法记录）
+ * 将列号转换为显示文本（红方用中文数字，黑方用阿拉伯数字）
  * @param col 列号 (0-8)
- * @returns 中文数字字符串
+ * @param color 棋子颜色
+ * @returns 数字字符串
  */
-function colToChineseNumber(col: number): string {
-  const chineseNumbers = ['一', '二', '三', '四', '五', '六', '七', '八', '九'];
-  return chineseNumbers[col];
+function colToDisplayText(col: number, color: 'red' | 'black'): string {
+  if (color === 'red') {
+    const chineseNumbers = ['一', '二', '三', '四', '五', '六', '七', '八', '九'];
+    return chineseNumbers[col];
+  } else {
+    // 黑方使用阿拉伯数字：col 0→"1", col 1→"2", ..., col 8→"9"
+    return String(col + 1);
+  }
 }
 
 /**
@@ -179,7 +185,7 @@ function colToChineseNumber(col: number): string {
  * @param toRow 目标行
  * @param toCol 目标列
  * @param piece 移动的棋子
- * @returns 中文着法字符串，如 "红俥进二"
+ * @returns 中文着法字符串，如 "俥一进二"（红方）或 "车1进1"（黑方）
  */
 export function generateChineseNotation(
   board: Board,
@@ -190,25 +196,39 @@ export function generateChineseNotation(
   piece: PieceType
 ): string {
   const color = getPieceColor(piece);
+  
+  // 安全检查：确保不是空棋子
+  if (color === 'empty') {
+    console.error('尝试为空白棋子生成着法记录');
+    return '';
+  }
+  
+  // TypeScript 类型收窄：此时 color 一定是 'red' | 'black'
+  const validColor = color as 'red' | 'black';
+  
   const pieceName = PIECE_NAMES[piece] || '?';
   
   // 确定方向：进、退、平
   let direction: string;
   let distance: string;
   
-  if (color === 'red') {
+  if (validColor === 'red') {
     // 红方：向上为进（row减小），向下为退（row增加）
     const rowDiff = fromRow - toRow;
     
     if (rowDiff > 0) {
       direction = '进';
-      distance = String(rowDiff);
+      // 红方步数使用中文数字
+      const chineseNumbers = ['一', '二', '三', '四', '五', '六', '七', '八', '九'];
+      distance = chineseNumbers[rowDiff - 1];
     } else if (rowDiff < 0) {
       direction = '退';
-      distance = String(-rowDiff);
+      // 红方步数使用中文数字
+      const chineseNumbers = ['一', '二', '三', '四', '五', '六', '七', '八', '九'];
+      distance = chineseNumbers[-rowDiff - 1];
     } else {
       direction = '平';
-      distance = colToChineseNumber(toCol);
+      distance = colToDisplayText(toCol, 'red');
     }
   } else {
     // 黑方：向下为进（row增加），向上为退（row减小）
@@ -216,18 +236,20 @@ export function generateChineseNotation(
     
     if (rowDiff > 0) {
       direction = '进';
+      // 黑方步数使用阿拉伯数字
       distance = String(rowDiff);
     } else if (rowDiff < 0) {
       direction = '退';
+      // 黑方步数使用阿拉伯数字
       distance = String(-rowDiff);
     } else {
       direction = '平';
-      distance = colToChineseNumber(toCol);
+      distance = colToDisplayText(toCol, 'black');
     }
   }
   
   // 格式：棋子名 + 起始列 + 方向 + 距离/目标列（不添加颜色前缀）
-  const fromColText = colToChineseNumber(fromCol);
+  const fromColText = colToDisplayText(fromCol, validColor);
   
   return `${pieceName}${fromColText}${direction}${distance}`;
 }
