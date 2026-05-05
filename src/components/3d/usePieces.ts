@@ -25,8 +25,7 @@ export function getCurrentFontName(): string {
 async function getFontUrl(path: string): Promise<string> {
   console.log(`🔍 getFontUrl - 原始路径: ${path}`);
   
-  // 这里的路径是相对于你上面 resources 配置的基准路径
-  // 它会自动帮你定位到 V:\4_mydoc\...\隶书.json
+  // 这里的路径是相对于 tauri.conf.json 中 resources 配置的基准路径
   const resourcePath = await resolveResource(path);
   console.log(`🔍 getFontUrl - resolveResource后: ${resourcePath}`);
 
