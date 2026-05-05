@@ -11,6 +11,12 @@ import {
   BOARD_COLS,
   generateChineseNotation
 } from '../logic/chess/constants';
+import {
+  parseSingleMove,
+  resolveMovePosition,
+  exportGameNotation,
+  detectAndParseNotation
+} from '../logic/chess/notation';
 
 // 着法记录接口
 export interface MoveRecord {
@@ -177,7 +183,6 @@ export const useChessStore = defineStore('chess', () => {
    */
   function undoMove(): boolean {
     if (currentMoveIndex.value < 0) {
-      console.log('无法悔棋：已回到初始状态');
       return false;
     }
     
@@ -195,7 +200,6 @@ export const useChessStore = defineStore('chess', () => {
     // 移动索引减1
     currentMoveIndex.value--;
     
-    console.log('悔棋成功，当前索引:', currentMoveIndex.value);
     return true;
   }
 
@@ -232,7 +236,6 @@ export const useChessStore = defineStore('chess', () => {
   function setPlayers(black: PlayerConfig, red: PlayerConfig) {
     blackPlayer.value = { ...black };
     redPlayer.value = { ...red };
-    console.log('玩家配置已更新:', { black, red });
   }
 
   /**
@@ -240,7 +243,6 @@ export const useChessStore = defineStore('chess', () => {
    */
   function setEngineConfig(config: EngineConfig) {
     engineConfig.value = { ...config };
-    console.log('引擎配置已更新:', config);
   }
 
   /**
@@ -272,6 +274,26 @@ export const useChessStore = defineStore('chess', () => {
     winner.value = null;
     redTime.value = 600;
     blackTime.value = 600;
+  }
+
+  /**
+   * 跳转到指定着法位置
+   * @param targetIndex 目标着法索引（从0开始）
+   */
+  function jumpToMove(targetIndex: number) {
+    if (targetIndex < 0 || targetIndex >= moveHistory.value.length) {
+      return;
+    }
+    
+    // 如果目标在当前之前，需要撤销
+    while (currentMoveIndex.value > targetIndex) {
+      undoMove();
+    }
+    
+    // 如果目标在当前之后，需要重做
+    while (currentMoveIndex.value < targetIndex) {
+      redoMove();
+    }
   }
 
   /**
@@ -355,7 +377,148 @@ export const useChessStore = defineStore('chess', () => {
    */
   function loadFromFEN(fenString: string) {
     // TODO: 实现 FEN 解析
-    console.log('Loading from FEN:', fenString);
+  }
+
+  /**
+   * 导出当前对局为标准棋谱格式
+   * @returns 标准棋谱文本字符串
+   */
+  function exportNotation(): string {
+    if (moveHistory.value.length === 0) {
+      return '';
+    }
+    
+    // 将 MoveRecord[] 转换为 notation 模块需要的格式
+    const moves: Array<{ round: number; red?: string; black?: string }> = [];
+    
+    moveHistory.value.forEach((record, index) => {
+      const roundNum = Math.floor(index / 2) + 1;
+      
+      if (index % 2 === 0) {
+        // 红方着法
+        // 提取纯着法部分（去掉"红"前缀）
+        const pureNotation = record.chineseNotation.replace(/^红/, '');
+        moves.push({ round: roundNum, red: pureNotation });
+      } else {
+        // 黑方着法，添加到上一个回合
+        const pureNotation = record.chineseNotation.replace(/^黑/, '');
+        if (moves.length > 0) {
+          moves[moves.length - 1].black = pureNotation;
+        }
+      }
+    });
+    
+    return exportGameNotation(moves);
+  }
+
+  /**
+   * 导入棋谱（尽力导入模式）
+   * @param text 棋谱文本
+   * @returns 是否成功解析（即使部分着法执行失败也返回true）
+   */
+  function importNotation(text: string): boolean {
+    try {
+      // 智能检测并解析棋谱
+      const detected = detectAndParseNotation(text);
+      
+      if (!detected.isNotation || !detected.parsed) {
+        console.error('无法识别为有效棋谱');
+        return false;
+      }
+      
+      const notation = detected.parsed;
+      
+      // 重置棋盘
+      resetGame();
+      
+      // 统计执行情况
+      let successCount = 0;
+      let failCount = 0;
+      let failedMoves: Array<{round: number, color: string, move: string}> = [];
+      
+      // 逐步应用每一步着法（失败不中断）
+      for (const move of notation.moves) {
+        // 应用红方着法
+        if (move.red && currentPlayer.value === 'red') {
+          const success = applySingleMove(move.red);
+          if (success) {
+            successCount++;
+          } else {
+            failCount++;
+            failedMoves.push({ round: move.round, color: '红方', move: move.red });
+          }
+        }
+        
+        // 应用黑方着法
+        if (move.black && currentPlayer.value === 'black') {
+          const success = applySingleMove(move.black);
+          if (success) {
+            successCount++;
+          } else {
+            failCount++;
+            failedMoves.push({ round: move.round, color: '黑方', move: move.black });
+          }
+        }
+      }
+      
+      // 显示执行结果摘要
+      if (failCount > 0) {
+        // 弹出提示
+        alert(
+          `棋谱导入完成！\n\n` +
+          `✅ 成功执行: ${successCount} 步\n` +
+          `⚠️ 执行失败: ${failCount} 步\n\n` +
+          `失败原因可能是：\n` +
+          `- 棋子位置与着法不匹配\n` +
+          `- 存在变着或研究着法\n` +
+          `- 棋盘状态异常\n\n` +
+          `您可以继续查看棋谱或手动调整。`
+        );
+      }
+      
+      return true;  // 只要格式正确就返回成功
+    } catch (error) {
+      console.error('导入棋谱时发生错误:', error);
+      return false;
+    }
+  }
+
+  /**
+   * 应用单个着法
+   * @param notationText 着法文本（如"炮二平五"）
+   * @returns 是否成功
+   */
+  function applySingleMove(notationText: string): boolean {
+    // 解析着法（不传 color，让 parseSingleMove 自动判断）
+    const parsed = parseSingleMove(notationText, board.value);
+    if (!parsed) {
+      return false;
+    }
+    
+    // 计算具体位置（使用解析出的实际颜色）
+    const isChineseNumber = /[一二三四五六七八九]/.test(notationText[1]);
+    const actualColor = isChineseNumber ? 'red' : 'black';
+    const position = resolveMovePosition(parsed, board.value, actualColor);
+    if (!position) {
+      return false;
+    }
+    
+    const [fromRow, fromCol, toRow, toCol] = position;
+    
+    // 执行移动（使用现有的 movePiece 方法）
+    const success = movePiece(fromRow, fromCol, toRow, toCol);
+    
+    return success;
+  }
+
+  /**
+   * 获取当前棋谱的元数据（如果有）
+   * @returns 元数据数组
+   */
+  function getNotationMetadata(): string[] {
+    // 注意：元数据只在导入时临时保存，不持久化到 store
+    // 如需持久化，可添加专门的字段
+    return [];
   }
 
   return {
@@ -383,6 +546,7 @@ export const useChessStore = defineStore('chess', () => {
     movePiece,
     undoMove,
     redoMove,
+    jumpToMove,
     resetGame,
     generateFEN,
     loadFromFEN,
@@ -390,5 +554,8 @@ export const useChessStore = defineStore('chess', () => {
     setEngineConfig,
     getCurrentPlayerAILevel,
     isCurrentPlayerAI,
+    exportNotation,
+    importNotation,
+    getNotationMetadata,
   };
 });

@@ -145,7 +145,7 @@ export function createPieceTexture(piece: PieceType, isRed: boolean): { colorTex
   ctx.fillStyle = isRed ? '#CC0000' : '#000000';
   
   // 隶书字体需要向上偏移约1/4字体高度（72px * 0.25 ≈ 18px）
-  const verticalOffset = currentFontName === 'LiSu' ? -4 : 4;
+  const verticalOffset = currentFontName === 'LiSu' ? 4 : 4;
   ctx.fillText(pieceName, size / 2, size / 2 + verticalOffset);
   
   const colorTexture = new THREE.CanvasTexture(canvas);
@@ -174,7 +174,7 @@ export function createPieceTexture(piece: PieceType, isRed: boolean): { colorTex
   normalCtx.fillStyle = '#FFFFFF';
   
   // 隶书字体需要向上偏移约小半个字体高度
-  const normalVerticalOffset = currentFontName === 'LiSu' ? -4 : 4;
+  const normalVerticalOffset = currentFontName === 'LiSu' ? 4 : 4;
   normalCtx.fillText(pieceName, size / 2, size / 2 + normalVerticalOffset);
   
   // 绘制白色圆形边框（凹陷区域）

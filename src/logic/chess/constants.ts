@@ -226,9 +226,8 @@ export function generateChineseNotation(
     }
   }
   
-  // 格式：颜色 + 棋子名 + 起始列 + 方向 + 距离/目标列
-  const sideText = color === 'red' ? '红' : '黑';
+  // 格式：棋子名 + 起始列 + 方向 + 距离/目标列（不添加颜色前缀）
   const fromColText = colToChineseNumber(fromCol);
   
-  return `${sideText}${pieceName}${fromColText}${direction}${distance}`;
+  return `${pieceName}${fromColText}${direction}${distance}`;
 }
