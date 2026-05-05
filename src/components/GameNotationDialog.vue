@@ -85,6 +85,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'update:visible', value: boolean): void;
   (e: 'close'): void;
+  (e: 'imported'): void;  // 导入完成事件
 }>();
 
 const chessStore = useChessStore();
@@ -169,6 +170,7 @@ function importNotation() {
   if (success) {
     alert('棋谱导入成功！');
     close();
+    emit('imported');
   } else {
     alert('棋谱导入失败，请检查格式是否正确');
   }

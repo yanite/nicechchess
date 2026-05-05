@@ -23,15 +23,11 @@ export function getCurrentFontName(): string {
 }
 
 async function getFontUrl(path: string): Promise<string> {
-  console.log(`🔍 getFontUrl - 原始路径: ${path}`);
-  
   // 这里的路径是相对于 tauri.conf.json 中 resources 配置的基准路径
   const resourcePath = await resolveResource(path);
-  console.log(`🔍 getFontUrl - resolveResource后: ${resourcePath}`);
 
   // 转换为 asset 协议
   const url = convertFileSrc(resourcePath);
-  console.log(`🔍 getFontUrl - convertFileSrc后: ${url}`);
   
   return url;
 }
@@ -43,16 +39,12 @@ async function getFontUrl(path: string): Promise<string> {
  */
 export async function loadChessFont(fontName: string, fontPath: string): Promise<void> {
   try {
-    console.log(`🔍 开始加载字体 "${fontName}"，路径: ${fontPath}`);
-    
     // 转换 Tauri 资源路径为 WebView 可访问的 URL
     const url = await getFontUrl(fontPath);
-    console.log(`📍 转换后的URL: ${url}`);
 
     // 创建 FontFace 对象
     const font = new FontFace(fontName, `url(${url})`);
     
-    console.log(`⏳ 正在加载字体...`);
     // 加载字体
     await font.load();
     
@@ -61,8 +53,6 @@ export async function loadChessFont(fontName: string, fontPath: string): Promise
     
     // 等待所有字体就绪
     await document.fonts.ready;
-    
-    console.log(`✅ 字体 "${fontName}" 加载成功`);
   } catch (error) {
     console.error(`❌ 字体 "${fontName}" 加载失败，将使用系统字体`, error);
     console.error(`   原始路径: ${fontPath}`);
