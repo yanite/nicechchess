@@ -2,13 +2,19 @@
 import ChessBoard3D from './components/3d/ChessBoard3D.vue';
 import SettingsDialog from './components/SettingsDialog.vue';
 import NewGameDialog, { type NewGameConfig } from './components/NewGameDialog.vue';
+import GameNotationDialog from './components/GameNotationDialog.vue';
 import { useChessStore } from './store/chessStore';
 import { computed, ref, onMounted, onUnmounted } from 'vue';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
 const chessStore = useChessStore();
+
+// ChessBoard3D 组件引用
+const boardRef = ref<InstanceType<typeof ChessBoard3D> | null>(null);
+
 const showSettings = ref(false);
 const showNewGameDialog = ref(false);
+const showNotationDialog = ref(false);
 
 // 窗口状态管理
 const WINDOW_STATE_KEY = 'chchess_window_state';
@@ -257,6 +263,21 @@ const currentPlayerText = computed(() => {
   return chessStore.currentPlayer === 'red' ? '红方' : '黑方';
 });
 
+/**
+ * 将着法中的中文数字转换为阿拉伯数字（用于黑方）
+ */
+function convertToArabicNumbers(notation: string): string {
+  const chineseNumbers = ['一', '二', '三', '四', '五', '六', '七', '八', '九'];
+  const arabicNumbers = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
+  
+  let result = notation;
+  for (let i = 0; i < chineseNumbers.length; i++) {
+    result = result.replace(new RegExp(chineseNumbers[i], 'g'), arabicNumbers[i]);
+  }
+  
+  return result;
+}
+
 // 计算着法历史显示（按回合分组）
 const moveHistoryText = computed(() => {
   const rounds: Array<{ 
@@ -270,20 +291,23 @@ const moveHistoryText = computed(() => {
   chessStore.moveHistory.forEach((move, index) => {
     const roundNum = Math.floor(index / 2) + 1;
     
+    // 转换着法格式：红方保持中文数字，黑方转换为阿拉伯数字
+    let displayNotation = move.chineseNotation;
+    
     if (index % 2 === 0) {
-      // 红方着法
-      rounds.push({ num: roundNum, red: move.chineseNotation, redIndex: index });
+      // 红方着法：保持原样（已经是中文数字）
+      rounds.push({ num: roundNum, red: displayNotation, redIndex: index });
     } else {
-      // 黑方着法，添加到上一个回合
+      // 黑方着法：将中文数字转换为阿拉伯数字
+      const arabicNotation = convertToArabicNumbers(displayNotation);
       if (rounds.length > 0) {
-        rounds[rounds.length - 1].black = move.chineseNotation;
+        rounds[rounds.length - 1].black = arabicNotation;
         rounds[rounds.length - 1].blackIndex = index;
       }
     }
   });
   
   return rounds.map(round => {
-    let text = '';
     let isRedUndone = false;
     let isBlackUndone = false;
     
@@ -295,20 +319,33 @@ const moveHistoryText = computed(() => {
       isBlackUndone = true;
     }
     
-    if (round.black) {
-      text = `${round.num}. ${round.red} ${round.black}`;
-    } else {
-      text = `${round.num}. ${round.red}`;
-    }
-    
     return {
-      text,
+      num: round.num,
+      red: round.red,
+      black: round.black,
+      redIndex: round.redIndex,
+      blackIndex: round.blackIndex,
       isRedUndone,
       isBlackUndone,
       hasBoth: !!round.black
     };
   });
 });
+
+/**
+ * 点击着法时，跳转到该着法位置
+ */
+function jumpToMove(moveIndex: number | undefined) {
+  if (moveIndex === undefined) return;
+  
+  // 调用 store 的方法跳转到指定着法
+  chessStore.jumpToMove(moveIndex);
+  
+  // 同步 3D 棋盘状态
+  if (boardRef.value && boardRef.value.syncBoardState) {
+    boardRef.value.syncBoardState();
+  }
+}
 
 // 重置游戏
 function resetGame() {
@@ -361,6 +398,11 @@ function openNewGameDialog() {
   showNewGameDialog.value = true;
 }
 
+// 打开棋谱对话框
+function openNotationDialog() {
+  showNotationDialog.value = true;
+}
+
 // 处理新游戏确认
 function handleNewGame(config: NewGameConfig) {
   console.log('新开局配置:', config);
@@ -391,6 +433,7 @@ function handleNewGame(config: NewGameConfig) {
         <button @click="openNewGameDialog">新游戏</button>
         <button @click="undoMove" :disabled="!chessStore.canUndo">悔棋</button>
         <button @click="redoMove" :disabled="!chessStore.canRedo">重做</button>
+        <button @click="openNotationDialog">棋谱</button>
         <button @click="openSettings">选项</button>
         <span class="game-info">
           当前: {{ currentPlayerText }} | 
@@ -413,6 +456,13 @@ function handleNewGame(config: NewGameConfig) {
       @confirm="handleNewGame"
     />
 
+    <!-- 棋谱管理对话框 -->
+    <GameNotationDialog 
+      :visible="showNotationDialog"
+      @update:visible="showNotationDialog = $event"
+      @close="showNotationDialog = false"
+    />
+
     <!-- 主内容区 -->
     <main class="main-content">
       <!-- 左侧边栏：着法记录 -->
@@ -420,13 +470,32 @@ function handleNewGame(config: NewGameConfig) {
         <h3>着法记录</h3>
         <div class="move-list">
           <div v-for="(move, index) in moveHistoryText" :key="index" class="move-item">
-            <span v-if="!move.isRedUndone && !move.isBlackUndone">{{ move.text }}</span>
-            <span v-else-if="move.isRedUndone && move.isBlackUndone" class="undone-move">{{ move.text }}</span>
-            <span v-else-if="move.isRedUndone" class="partially-undone-move">
-              {{ move.text }}
+            <span class="round-number">{{ move.num }}.</span>
+            
+            <!-- 红方着法 -->
+            <span 
+              v-if="move.red" 
+              class="red-move"
+              :class="{ 
+                'current': move.redIndex === chessStore.currentMoveIndex,
+                'undone': move.isRedUndone 
+              }"
+              @click="jumpToMove(move.redIndex)"
+            >
+              {{ move.red }}
             </span>
-            <span v-else class="partially-undone-move">
-              {{ move.text }}
+            
+            <!-- 黑方着法 -->
+            <span 
+              v-if="move.black" 
+              class="black-move"
+              :class="{ 
+                'current': move.blackIndex === chessStore.currentMoveIndex,
+                'undone': move.isBlackUndone 
+              }"
+              @click="jumpToMove(move.blackIndex)"
+            >
+              {{ move.black }}
             </span>
           </div>
           <div v-if="chessStore.moveHistory.length === 0" class="empty-hint">
@@ -437,7 +506,7 @@ function handleNewGame(config: NewGameConfig) {
 
       <!-- 中间：3D 棋盘 -->
       <div class="board-container">
-        <ChessBoard3D />
+        <ChessBoard3D ref="boardRef" />
       </div>
 
       <!-- 右侧边栏：分析信息（预留） -->
@@ -568,18 +637,69 @@ export default {
   border-radius: 3px;
   font-size: 13px;
   font-family: monospace;
+  display: flex;
+  gap: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s;
 }
 
-/* 已撤销的着法（完全灰色） */
-.undone-move {
-  color: #bdc3c7;
+.move-item:hover {
+  background-color: #ecf0f1;
+}
+
+.round-number {
+  color: #7f8c8d;
+  min-width: 25px;
+}
+
+.red-move {
+  color: #c0392b; /* 红方着法颜色 */
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 2px;
+  transition: background-color 0.2s, font-weight 0.2s;
+}
+
+.red-move:hover {
+  background-color: rgba(192, 57, 43, 0.1);
+}
+
+/* 当前着法加粗 */
+.red-move.current {
+  font-weight: bold;
+  background-color: rgba(192, 57, 43, 0.15);
+}
+
+.black-move {
+  color: #2c3e50; /* 黑方着法颜色 */
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 2px;
+  transition: background-color 0.2s, font-weight 0.2s;
+}
+
+.black-move:hover {
+  background-color: rgba(44, 62, 80, 0.1);
+}
+
+/* 当前着法加粗 */
+.black-move.current {
+  font-weight: bold;
+  background-color: rgba(44, 62, 80, 0.15);
+}
+
+/* 已撤销的着法 */
+.undone {
+  opacity: 0.4;
   text-decoration: line-through;
+  cursor: default !important;
 }
 
-/* 部分撤销的着法（半透明） */
-.partially-undone-move {
-  color: #95a5a6;
-  opacity: 0.6;
+/* 异常着法（黄色斜体）- 用于标记有问题的着法 */
+.abnormal {
+  color: #f39c12 !important;
+  font-style: italic;
+  background-color: rgba(243, 156, 18, 0.1);
 }
 
 .empty-hint {

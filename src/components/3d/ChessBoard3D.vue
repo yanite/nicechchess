@@ -308,6 +308,14 @@ function updatePieceShape(shape: 'cylinder' | 'standard') {
   syncPiecesWithBoard(piecesGroup, scene, chessStore.board, currentPieceShape, opponentTextDirection, pieceTextRandomRotation);
 }
 
+/**
+ * 同步棋盘状态（用于悔棋、重做、跳转等操作）
+ */
+function syncBoardState() {
+  console.log('同步棋盘状态');
+  syncPiecesWithBoard(piecesGroup, scene, chessStore.board, currentPieceShape, opponentTextDirection, pieceTextRandomRotation);
+}
+
 // 监听棋盘状态变化，同步3D视图
 // 注意：不再监听 chessStore.board 的变化
 // 棋子移动由 executeMove 和 executeAIMove 直接处理位置更新
@@ -490,7 +498,8 @@ onMounted(() => {
 
 // 暴露方法给父组件
 defineExpose({
-  updatePieceShape
+  updatePieceShape,
+  syncBoardState
 });
 
 onBeforeUnmount(() => {
