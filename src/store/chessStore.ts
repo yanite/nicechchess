@@ -231,7 +231,7 @@ export const useChessStore = defineStore('chess', () => {
     // 切换行棋方
     currentPlayer.value = currentPlayer.value === 'red' ? 'black' : 'red';
     
-    console.log('重做成功，当前索引:', currentMoveIndex.value);
+    // console.log('重做成功，当前索引:', currentMoveIndex.value);
     return true;
   }
 
