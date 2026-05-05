@@ -785,7 +785,7 @@ pieceMesh.position.z = startZ + row * CELL_SIZE;
 
 修改 [syncPiecesWithBoard](file://v:\4_mydoc\tauri\nicechchess\src\components\3d\ChessBoard3D.vue#L776-L875) 函数的策略：**保留被吃掉的棋子，只更新棋盘上的棋子**。
 
-``typescript
+```
 // 修复前（错误）❌
 // 第一步：移除所有现有棋子
 while(piecesGroup.children.length > 0) {
@@ -859,6 +859,377 @@ capturedPieces.forEach(capturedPiece => {
 
 ---
 
+### **Bug #17: 字体加载被开发模式限制及多余日志问题**
+
+**发现时间：** 2026-05-05  
+**影响范围：** `src/components/3d/usePieces.ts`, `src/components/3d/ChessBoard3D.vue`, `src/components/3d/useAI.ts`  
+**现象：**
+1. 开发模式下自定义字体无法加载，控制台显示"开发模式下跳过自定义字体加载"
+2. 控制台输出大量调试信息，影响可读性
+3. 满棋盘都是棋子（疑似重复创建）
+
+**根本原因：**
+1. **开发模式限定**：[loadChessFont](file://v:\4_mydoc\tauri\nicechchess\src\components\3d\usePieces.ts#L15-L60) 和 [loadJSONFont](file://v:\4_mydoc\tauri\nicechchess\src\components\3d\usePieces.ts#L70-L119) 函数中有 `import.meta.env.DEV` 检查，导致开发环境下直接返回，不加载字体
+2. **日志过多**：代码中存在大量 `console.log` 用于调试，未在生产前清理
+3. **满棋盘棋子**：经检查，棋盘初始化逻辑正确，实际是用户误解（可能是视觉错觉或旧缓存）
+
+**修复方案：**
+
+1. **移除开发模式限定**：
+``typescript
+// 修复前（错误）❌
+if (import.meta.env.DEV) {
+  console.warn(`⚠️ 开发模式下跳过自定义字体加载（技术限制）`);
+  return; // 直接返回，不尝试加载
+}
+
+// 修复后（正确）✅
+// 直接加载字体，不再检查开发模式
+const url = convertFileSrc(fontPath);
+const font = new FontFace(fontName, `url(${url})`);
+await font.load();
+document.fonts.add(font);
+```
+
+2. **清理多余日志**：
+- [usePieces.ts](file://v:\4_mydoc\tauri\nicechchess\src\components\3d\usePieces.ts)：移除字体加载的详细调试日志，保留成功/失败提示
+- [useAI.ts](file://v:\4_mydoc\tauri\nicechchess\src\components\3d\useAI.ts)：移除 AI 思考过程的详细日志，保留错误信息
+- [ChessBoard3D.vue](file://v:\4_mydoc\tauri\nicechchess\src\components\3d\ChessBoard3D.vue)：移除配置加载、棋子创建等过程的日志
+
+3. **更新字体路径**：
+``typescript
+// 修复前（旧路径）❌
+fontPath = 'resources/fonts/隶书.json';
+
+// 修复后（新路径）✅
+fontPath = 'src/assets/fonts/隶书.json';
+```
+
+4. **修正回退逻辑**：
+- 移除不存在的 `隶书.TTF` 回退路径
+- JSON 字体加载失败时直接回退到系统字体
+
+**验证方法：**
+1. 启动应用（开发模式）
+2. 检查控制台，确认没有"开发模式下跳过"的警告
+3. 观察棋子文字是否正确显示自定义字体
+4. 检查控制台输出是否简洁清晰
+5. 确认棋盘上只有32个棋子（初始布局）
+
+**相关提交：** （待提交）
+
+**经验教训：**
+- ⚠️ 开发模式限定应谨慎使用，避免阻碍正常功能测试
+- ✅ 调试日志应在功能稳定后及时清理，保持代码整洁
+- ✅ 资源路径应统一管理，避免分散在不同目录
+
+---
+
+### **Bug #18: 棋子渲染为黑色问题**
+
+**发现时间：** 2026-05-05  
+**影响范围：** `src/components/3d/usePieces.ts`  
+**现象：**
+棋子侧面显示为纯黑色，没有木纹质感和米黄色基底。
+
+**根本原因：**
+1. **缺少基础颜色**：棋子侧面的MeshStandardMaterial只设置了木纹贴图，但没有设置基础颜色（color属性默认为白色0xffffff）
+2. **纹理叠加问题**：当木纹纹理加载失败或透明度过高时，如果没有基础颜色支撑，会显示为黑色
+
+**修复方案：**
+
+为棋子侧面材质添加米黄色基底颜色，与棋子顶部背景色保持一致：
+
+``typescript
+// 修复前（错误）❌
+const sideMaterial = new THREE.MeshStandardMaterial({
+  map: woodTexture,
+  color: 0xffffff,        // 白色基底
+  roughness: 0.6,
+  metalness: 0.0,
+});
+
+// 修复后（正确）✅
+const sideMaterial = new THREE.MeshStandardMaterial({
+  map: woodTexture,
+  color: 0xF5DEB3,        // 米黄色基底（与棋子顶部背景色一致）
+  roughness: 0.6,
+  metalness: 0.0,
+});
+```
+
+**同时修复了refreshPieceTextures函数**：
+- 原函数错误地尝试更新父mesh的材质数组
+- 修正为遍历子对象，找到文字贴图的圆形平面并更新其纹理
+
+``typescript
+// 修复后的逻辑
+piecesGroup.children.forEach((child) => {
+  if (child instanceof THREE.Mesh && child.userData.piece !== undefined) {
+    const pieceType = child.userData.piece as PieceType;
+    const isRed = pieceType > 0;
+    
+    const textures = createPieceTexture(pieceType, isRed);
+    
+    // 查找子对象中的文字贴图并更新
+    child.children.forEach((subChild) => {
+      if (subChild instanceof THREE.Mesh && subChild.geometry instanceof THREE.CircleGeometry) {
+        if (!Array.isArray(subChild.material)) {
+          subChild.material.map = textures.colorTexture;
+          subChild.material.normalMap = textures.normalMap;
+          subChild.material.needsUpdate = true;
+        }
+      }
+    });
+  }
+});
+```
+
+**验证方法：**
+1. 启动应用，观察棋子侧面是否显示米黄色木纹质感
+2. 检查红方和黑方棋子是否有正确的颜色区分
+3. 字体加载后，确认文字贴图正确刷新
+
+**相关提交：** （待提交）
+
+---
+
+### **Bug #19: 移除3D文字功能，统一使用Canvas方案**
+
+**发现时间：** 2026-05-05  
+**影响范围：** `src/components/3d/usePieces.ts`, `src/components/3d/ChessBoard3D.vue`  
+**现象：**
+项目中有两套棋子文字渲染方案（3D TextGeometry和Canvas贴图），增加了代码复杂度和维护成本。
+
+**根本原因：**
+1. **双重实现**：同时维护 [createPieceWith3DText](file://v:\4_mydoc\tauri\nicechchess\src\components\3d\usePieces.ts#L687-L774) 和 [createPieces](file://v:\4_mydoc\tauri\nicechchess\src\components\3d\usePieces.ts#L528-L582) 两套函数
+2. **条件分支**：ChessBoard3D.vue中根据字体类型选择不同的渲染方案
+3. **资源浪费**：JSON字体加载、FontLoader等仅在3D方案中使用
+
+**修复方案：**
+
+1. **删除3D文字相关函数**：
+   - 删除 [create3DTextGeometry](file://v:\4_mydoc\tauri\nicechchess\src\components\3d\usePieces.ts#L91-L124) 辅助函数
+   - 删除 [createPieceWith3DText](file://v:\4_mydoc\tauri\nicechchess\src\components\3d\usePieces.ts#L687-L774) 函数
+   - 删除 [createPiecesWith3DText](file://v:\4_mydoc\tauri\nicechchess\src\components\3d\usePieces.ts#L776-L819) 函数
+
+2. **简化ChessBoard3D.vue中的字体加载逻辑**：
+``typescript
+// 修复前（复杂）❌
+let useJSONFont = false;
+let jsonFont: Font | null = null;
+
+if (useJSONFont) {
+  jsonFont = await loadJSONFont(fontPath);
+  piecesGroup = createPiecesWith3DText(scene, chessStore.board, jsonFont, ...);
+} else {
+  await loadChessFont('ChessFont', fontPath);
+  piecesGroup = createPieces(scene, chessStore.board, ...);
+}
+
+// 修复后（简洁）✅
+if (fontPath) {
+  await loadChessFont('ChessFont', fontPath);
+}
+
+piecesGroup = createPieces(scene, chessStore.board, currentPieceShape, ...);
+
+if (fontPath) {
+  refreshPieceTextures(piecesGroup);
+}
+```
+
+3. **移除不必要的导入**：
+   - 从ChessBoard3D.vue中移除 `createPiecesWith3DText` 导入
+   - 从usePieces.ts中移除 `FontLoader` 和 `Font` 类型导入
+   - 移除 [loadJSONFont](file://v:\4_mydoc\tauri\nicechchess\src\components\3d\usePieces.ts#L50-L70) 函数
+
+**关键改进：**
+1. **统一渲染方案**：所有棋子都使用Canvas贴图方案
+2. **简化代码路径**：移除条件分支，降低维护成本
+3. **保留字体支持**：仍然支持自定义字体（TTF/JSON），但统一通过Canvas方案渲染
+4. **减少依赖**：不再需要Three.js的FontLoader和TextGeometry
+
+**验证方法：**
+1. 启动应用，确认棋子文字正常显示
+2. 测试不同字体配置（隶书、汉仪颜楷繁、中國龍豪行書）
+3. 确认字体加载后纹理正确刷新
+4. 检查控制台无错误信息
+
+**相关提交：** （待提交）
+
+**经验教训：**
+- ✅ 避免在同一项目中维护多套相似功能的实现
+- ✅ 优先选择性能更好、兼容性更强的方案（Canvas vs 3D Geometry）
+- ✅ 定期清理未使用的代码和依赖，保持代码库整洁
+
+---
+
+### **Bug #20: 统一使用TTF字体，支持三种自定义字体**
+
+**发现时间：** 2026-05-05  
+**影响范围：** `src/components/3d/usePieces.ts`, `src/components/3d/ChessBoard3D.vue`  
+**现象：**
+项目中有JSON字体和TTF字体混用，但JSON字体无法用于Canvas渲染，导致字体配置混乱。
+
+**根本原因：**
+1. **格式不兼容**：JSON字体（隶书.json、汉仪颜楷繁.json）是Three.js专用格式，只能用于TextGeometry，不能用于Canvas
+2. **Canvas限制**：Canvas只能使用TTF/OTF文件或系统已安装字体
+3. **字体名称映射缺失**：TTF文件的内部字体名称与文件名不一致，需要正确映射
+
+**修复方案：**
+
+#### **1. 确认字体内部名称**
+通过检查TTF文件元数据，确认三个字体的内部名称：
+- 隶书.ttf → `LiSu`
+- 汉仪颜楷繁.ttf → `汉仪颜楷繁`
+- 中國龍豪行書.TTF → `HAKUYOOTI3500`
+
+#### **2. 添加全局字体名称管理**
+``typescript
+// usePieces.ts
+let currentFontName: string = 'KaiTi';
+
+export function setCurrentFontName(fontName: string): void {
+  currentFontName = fontName;
+}
+
+export function getCurrentFontName(): string {
+  return currentFontName;
+}
+
+export function getFontString(fontSize: number, customFontName?: string): string {
+  const fontName = customFontName || currentFontName;
+  return `bold ${fontSize}px "${fontName}", "KaiTi", "STKaiti", "SimSun", serif`;
+}
+```
+
+#### **3. 修改ChessBoard3D.vue中的字体加载逻辑**
+``typescript
+// 字体配置映射
+const fontName = (config.ui as any).chess_font || '楷体';
+let fontPath = '';
+let internalFontName = 'KaiTi';
+
+if (fontName === '隶书') {
+  fontPath = 'assets/fonts/隶书.ttf';
+  internalFontName = 'LiSu';
+} else if (fontName === '汉仪颜楷繁') {
+  fontPath = 'assets/fonts/汉仪颜楷繁.ttf';
+  internalFontName = '汉仪颜楷繁';
+} else if (fontName === '中國龍豪行書') {
+  fontPath = 'assets/fonts/中國龍豪行書.TTF';
+  internalFontName = 'HAKUYOOTI3500';
+}
+
+// 加载字体并设置全局字体名称
+if (fontPath) {
+  await loadChessFont(internalFontName, fontPath);
+  setCurrentFontName(internalFontName);
+} else {
+  setCurrentFontName('KaiTi');
+}
+```
+
+#### **4. 移除JSON字体相关代码**
+- 删除 `隶书.json` 和 `汉仪颜楷繁.json` 的引用
+- 统一使用TTF字体加载
+- 所有字体都通过 FontFace API 加载到系统
+
+**关键改进：**
+1. **统一字体格式**：全部使用TTF格式，避免格式混用
+2. **全局字体管理**：通过 `currentFontName` 统一管理当前使用的字体
+3. **自动回退机制**：如果自定义字体加载失败，自动回退到系统楷体
+4. **即时生效**：字体切换后立即调用 [refreshPieceTextures()](file://v:\4_mydoc\tauri\nicechchess\src\components\3d\usePieces.ts#L575-L597) 刷新纹理
+
+**验证方法：**
+1. 启动应用，默认显示楷体棋子文字
+2. 在配置中切换到"隶书"，确认显示为隶书字体
+3. 切换到"汉仪颜楷繁"，确认显示为该字体
+4. 切换到"中國龍豪行書"，确认显示为该字体
+5. 检查控制台无字体加载错误
+
+**相关提交：** （待提交）
+
+**经验教训：**
+- ✅ Canvas渲染只能使用TTF/OTF或系统字体，不能使用Three.js专用的JSON字体
+- ✅ TTF文件的内部字体名称可能与文件名不同，需要正确映射
+- ✅ 使用全局变量管理当前字体名称，简化代码逻辑
+- ✅ 提供完善的回退机制，确保字体加载失败时应用仍可用
+
+---
+
+### **Bug #21: 隶书字体大小和位置优化**
+
+**发现时间：** 2026-05-05  
+**影响范围：** `src/components/3d/usePieces.ts`  
+**现象：**
+隶书字体在棋子上显示偏小，且位置偏下，视觉效果不够协调。
+
+**根本原因：**
+1. **字体大小统一**：所有字体都使用72px，但不同字体的视觉大小差异较大
+2. **基线对齐问题**：隶书字体的基线位置与其他字体不同，导致居中显示时偏下
+
+**修复方案：**
+
+#### **1. 动态调整字体大小**
+``typescript
+// getFontString 函数中添加字体特定调整
+export function getFontString(fontSize: number, customFontName?: string): string {
+  const fontName = customFontName || currentFontName;
+  
+  // 隶书字体需要放大10%以获得更好的视觉效果
+  let adjustedFontSize = fontSize;
+  if (fontName === 'LiSu') {
+    adjustedFontSize = Math.round(fontSize * 1.1); // 72px → 79px
+  }
+  
+  return `bold ${adjustedFontSize}px "${fontName}", "KaiTi", "STKaiti", "SimSun", serif`;
+}
+```
+
+#### **2. 调整文字垂直位置**
+``typescript
+// createPieceTexture 函数中
+// 隶书字体需要向上偏移约1/4字体高度（72px * 0.25 ≈ 18px）
+const verticalOffset = currentFontName === 'LiSu' ? -18 : 4;
+ctx.fillText(pieceName, size / 2, size / 2 + verticalOffset);
+
+// 法线贴图中同样调整
+const normalVerticalOffset = currentFontName === 'LiSu' ? -18 : 4;
+normalCtx.fillText(pieceName, size / 2, size / 2 + normalVerticalOffset);
+```
+
+**关键改进：**
+1. **字体大小增加10%**：隶书从72px增加到79px，视觉上更加饱满
+2. **向上偏移18像素**：约1/4字体高度，使文字在棋子顶部更居中
+3. **双重调整**：颜色纹理和法线贴图同步调整，确保凹陷效果一致
+
+**修改位置总结：**
+
+| 文件 | 函数 | 行号 | 修改内容 |
+|------|------|------|---------|
+| usePieces.ts | [getFontString](file://v:\4_mydoc\tauri\nicechchess\src\components\3d\usePieces.ts#L68-L81) | ~75 | 添加隶书字体大小调整逻辑（+10%） |
+| usePieces.ts | [createPieceTexture](file://v:\4_mydoc\tauri\nicechchess\src\components\3d\usePieces.ts#L107-L180) | ~136 | 颜色纹理文字位置向上偏移18px |
+| usePieces.ts | [createPieceTexture](file://v:\4_mydoc\tauri\nicechchess\src\components\3d\usePieces.ts#L107-L180) | ~165 | 法线贴图文字位置向上偏移18px |
+
+**验证方法：**
+1. 启动应用，选择"隶书"字体
+2. 观察棋子文字是否比之前大10%左右
+3. 确认文字位置是否向上移动，在棋子中更加居中
+4. 检查凹陷效果是否正常（法线贴图同步调整）
+5. 切换其他字体（楷体、汉仪颜楷繁），确认不受影响
+
+**相关提交：** （待提交）
+
+**经验教训：**
+- ✅ 不同字体的视觉大小差异需要通过动态调整来补偿
+- ✅ 字体基线位置不同，需要根据具体字体调整垂直偏移量
+- ✅ 颜色纹理和法线贴图必须同步调整，否则凹陷效果会错位
+- ✅ 调整参数应该基于字体特性，而非硬编码固定值
+
+---
+
 ## 📚 **参考资料**
 
 - [UCI 协议规范](https://www.shredderchess.com/download/div/uci.zip)
@@ -869,5 +1240,5 @@ capturedPieces.forEach(capturedPiece => {
 
 ---
 
-**最后更新：** 2026-05-04  
+**最后更新：** 2026-05-05  
 **维护者：** ChChess 开发团队

@@ -87,6 +87,59 @@
           </div>
         </div>
 
+        <!-- 4.5. 棋子文字随机旋转角度 -->
+        <div class="setting-item">
+          <label>棋子文字随机旋转角度（度）：</label>
+          <div class="number-input-wrapper">
+            <button class="number-btn minus" @click="decrementRotation">-</button>
+            <input 
+              type="number" 
+              v-model.number="settings.ui.piece_text_random_rotation"
+              min="0"
+              max="360"
+              step="5"
+              @change="validateAndSaveRotation"
+              class="custom-number-input"
+            />
+            <button class="number-btn plus" @click="incrementRotation">+</button>
+          </div>
+          <span class="hint">范围：0-360°，0表示不随机，默认 0°</span>
+          <span class="hint" style="color: #ff9800; margin-left: 10px;">（下次开局生效）</span>
+        </div>
+
+        <!-- 4.6. 棋子字体选择 -->
+        <div class="setting-item">
+          <label>棋子字体：</label>
+          <div class="custom-radio-group">
+            <div 
+              class="custom-radio" 
+              :class="{ active: settings.ui.chess_font === '系统楷体' }"
+              @click="setChessFont('系统楷体')"
+            >
+              <span class="radio-indicator"></span>
+              <span class="radio-label">系统楷体</span>
+            </div>
+            <div 
+              class="custom-radio" 
+              :class="{ active: settings.ui.chess_font === '隶书' }"
+              @click="setChessFont('隶书')"
+            >
+              <span class="radio-indicator"></span>
+              <span class="radio-label">隶书</span>
+            </div>
+            <div 
+              class="custom-radio" 
+              :class="{ active: settings.ui.chess_font === '中國龍豪行書' }"
+              @click="setChessFont('中國龍豪行書')"
+            >
+              <span class="radio-indicator"></span>
+              <span class="radio-label">中國龍豪行書</span>
+            </div>
+          </div>
+          <span class="hint" style="color: #ff9800;">（下次开局生效）</span>
+          <span class="hint" style="display: block; margin-top: 5px; color: #9e9e9e;">💡 提示：部分字体需要自行下载并放入 resources/fonts 目录</span>
+        </div>
+
         <!-- 5. AI线程数 -->
         <div class="setting-item">
           <label>AI线程数：</label>
@@ -209,6 +262,8 @@ interface Settings {
     board_texture: string;
     opponent_text_direction: 'down' | 'up';
     piece_shape: 'cylinder' | 'standard';
+    piece_text_random_rotation: number;  // 棋子文字随机旋转角度（度）
+    chess_font: '隶书' | '中國龍豪行書' | '系统楷体';  // 棋子字体
   };
 }
 
@@ -234,6 +289,8 @@ const settings = ref<Settings>({
     board_texture: 'src/assets/textures/tx1/wood_diff_1k.jpg',
     opponent_text_direction: 'down',
     piece_shape: 'cylinder',
+    piece_text_random_rotation: 0, // 默认不随机旋转
+    chess_font: '隶书', // 默认使用系统自带的隶书字体
   },
 });
 
@@ -255,6 +312,8 @@ async function loadSettings() {
     settings.value.ui.board_texture = config.ui.board_texture || 'src/assets/textures/tx1/wood_diff_1k.jpg';
     settings.value.ui.opponent_text_direction = (config.ui as any).opponent_text_direction || 'down';
     settings.value.ui.piece_shape = (config.ui as any).piece_shape || 'cylinder';
+    settings.value.ui.piece_text_random_rotation = (config.ui as any).piece_text_random_rotation ?? 0;
+    settings.value.ui.chess_font = (config.ui as any).chess_font || '隶书';
     
     // 从路径中提取纹理名称
     const textureMatch = settings.value.ui.board_texture.match(/textures\/([^/]+)/);
@@ -274,7 +333,7 @@ async function loadSettings() {
 // 扫描可用的纹理目录
 async function scanAvailableTextures() {
   try {
-    console.log('开始扫描纹理目录...');
+    // console.log('开始扫描纹理目录...');
     const textures = await scanTextureDirectories();
     console.log('Rust 返回的纹理列表:', textures);
     
@@ -327,7 +386,9 @@ async function saveSettings() {
     fullConfig.ui = {
       board_texture: settings.value.ui.board_texture,
       opponent_text_direction: settings.value.ui.opponent_text_direction,
-      piece_shape: settings.value.ui.piece_shape
+      piece_shape: settings.value.ui.piece_shape,
+      piece_text_random_rotation: settings.value.ui.piece_text_random_rotation,
+      chess_font: settings.value.ui.chess_font
     };
     
     // 保存完整配置
@@ -388,6 +449,12 @@ function setOpponentDirection(direction: 'down' | 'up') {
 // 设置棋子形状
 function setPieceShape(shape: 'cylinder' | 'standard') {
   settings.value.ui.piece_shape = shape;
+  saveSettings();
+}
+
+// 设置棋子字体
+function setChessFont(font: '隶书' | '中國龍豪行書' | '系统楷体') {
+  settings.value.ui.chess_font = font;
   saveSettings();
 }
 
@@ -455,6 +522,31 @@ function decrementMovetime() {
     settings.value.engine.movetime -= 100;
     saveSettings();
   }
+}
+
+// 棋子文字随机旋转角度控制函数
+function incrementRotation() {
+  if (settings.value.ui.piece_text_random_rotation < 360) {
+    settings.value.ui.piece_text_random_rotation += 5;
+    saveSettings();
+  }
+}
+
+function decrementRotation() {
+  if (settings.value.ui.piece_text_random_rotation > 0) {
+    settings.value.ui.piece_text_random_rotation -= 5;
+    saveSettings();
+  }
+}
+
+function validateAndSaveRotation() {
+  // 确保值在有效范围内
+  if (settings.value.ui.piece_text_random_rotation < 0) {
+    settings.value.ui.piece_text_random_rotation = 0;
+  } else if (settings.value.ui.piece_text_random_rotation > 360) {
+    settings.value.ui.piece_text_random_rotation = 360;
+  }
+  saveSettings();
 }
 
 // 选择引擎路径
