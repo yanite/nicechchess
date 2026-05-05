@@ -21,7 +21,7 @@ import { loadConfig } from '../../services/configService';
 // 导入模块化功能
 import { useScene } from './useScene';
 import { createBoard, BOARD_WIDTH, BOARD_HEIGHT, CELL_SIZE } from './useBoard';
-import { createPieces, syncPiecesWithBoard, resetPiecePosition as resetPiecePositionFunc } from './usePieces';
+import { createPieces, syncPiecesWithBoard, resetPiecePosition as resetPiecePositionFunc, loadChessFont, refreshPieceTextures, setCurrentFontName } from './usePieces';
 import { useInteraction } from './useInteraction';
 import { useAI } from './useAI';
 import { useGameState } from './useGameState';
@@ -32,6 +32,7 @@ const chessStore = useChessStore();
 // 棋子形状配置
 let currentPieceShape: 'cylinder' | 'standard' = 'cylinder';
 let opponentTextDirection: 'down' | 'up' = 'down';
+let pieceTextRandomRotation: number = 0; // 棋子文字随机旋转角度（度）
 
 // Three.js 相关变量
 let scene: THREE.Scene;
@@ -155,6 +156,9 @@ function executeMove(fromRow: number, fromCol: number, toRow: number, toCol: num
   draggedPiece.position.x = startX + toCol * CELL_SIZE;
   draggedPiece.position.z = startZ + toRow * CELL_SIZE;
   
+  // 恢复正确的y坐标（根据棋子形状）
+  resetPiecePositionFunc(draggedPiece, currentPieceShape);
+  
   // 4. 更新棋盘数据
   chessStore.movePiece(fromRow, fromCol, toRow, toCol);
   
@@ -162,14 +166,10 @@ function executeMove(fromRow: number, fromCol: number, toRow: number, toCol: num
   checkCheckAndCheckmate(toRow, toCol);
   
   // 6. 如果当前玩家是 AI，触发 AI 行棋（支持双 AI）
-  console.log('移动完成，当前玩家:', chessStore.currentPlayer);
   if (chessStore.isCurrentPlayerAI()) {
-    console.log('检测到当前玩家是AI，准备触发 AI...');
     setTimeout(() => {
       if (aiModule) aiModule.triggerAIMove();
     }, 1000);
-  } else {
-    console.log('当前是人类玩家，等待操作');
   }
 }
 
@@ -184,11 +184,9 @@ async function initScene() {
   try {
     const config = await loadConfig();
     boardTexturePath = config.ui.board_texture;
-    currentPieceShape = config.ui.piece_shape || 'cylinder'; // 加载棋子形状
-    opponentTextDirection = config.ui.opponent_text_direction || 'down'; // 加载对方棋子字体方向
-    console.log('加载棋盘纹理配置:', boardTexturePath);
-    console.log('加载棋子形状配置:', currentPieceShape);
-    console.log('加载对方棋子字体方向配置:', opponentTextDirection);
+    currentPieceShape = config.ui.piece_shape || 'cylinder';
+    opponentTextDirection = config.ui.opponent_text_direction || 'down';
+    pieceTextRandomRotation = (config.ui as any).piece_text_random_rotation ?? 0;
   } catch (error) {
     console.warn('加载配置失败，使用默认纹理:', error);
   }
@@ -205,12 +203,51 @@ async function initScene() {
   mouse = sceneData.mouse;
   lineMaterials = sceneData.lineMaterials;
 
+  // 加载自定义字体（如果存在）
+  // 根据配置选择字体
+  const config = await loadConfig();
+  const fontName = (config.ui as any).chess_font || '楷体';
+  
+  let fontPath = '';
+  let internalFontName = 'KaiTi'; // Canvas使用的内部字体名称
+  
+  if (fontName === '隶书') {
+    fontPath = 'assets/fonts/隶书.ttf';
+    internalFontName = 'LiSu';
+  } else if (fontName === '中國龍豪行書') {
+    fontPath = 'assets/fonts/中國龍豪行書.TTF';
+    internalFontName = 'HAKUYOOTI3500';
+  } else {
+    // 系统楷体，不加载自定义字体
+    console.log('使用系统楷体，跳过自定义字体加载');
+    fontPath = '';
+    internalFontName = 'KaiTi';
+  }
+  
+  if (fontPath) {
+    // 加载 TTF 字体（Canvas 方案）
+    await loadChessFont(internalFontName, fontPath);
+    
+    // 设置全局字体名称，供Canvas渲染使用
+    setCurrentFontName(internalFontName);
+  } else {
+    // 使用系统楷体
+    setCurrentFontName('KaiTi');
+  }
+
   // 添加灯光
   // setupLights 已在 initScene 中调用
 
   // 创建棋盘和棋子
   boardGroup = createBoard(scene, boardTexturePath, container.value, lineMaterials);
-  piecesGroup = createPieces(scene, chessStore.board, currentPieceShape, opponentTextDirection);
+  
+  // 使用 Canvas 方案创建棋子
+  piecesGroup = createPieces(scene, chessStore.board, currentPieceShape, opponentTextDirection, pieceTextRandomRotation);
+  
+  // 如果使用了自定义字体，需要刷新纹理以确保字体生效
+  if (fontPath) {
+    refreshPieceTextures(piecesGroup);
+  }
 
   // 初始化 AI 模块和交互模块（在场景初始化之后）
   aiModule = useAI(
@@ -268,17 +305,13 @@ function updatePieceShape(shape: 'cylinder' | 'standard') {
   currentPieceShape = shape;
   
   // 重建所有棋子
-  syncPiecesWithBoard(piecesGroup, scene, chessStore.board, currentPieceShape, opponentTextDirection);
+  syncPiecesWithBoard(piecesGroup, scene, chessStore.board, currentPieceShape, opponentTextDirection, pieceTextRandomRotation);
 }
 
 // 监听棋盘状态变化，同步3D视图
-watch(
-  () => chessStore.board,
-  () => {
-    syncPiecesWithBoard(piecesGroup, scene, chessStore.board, currentPieceShape, opponentTextDirection);
-  },
-  { deep: true }
-);
+// 注意：不再监听 chessStore.board 的变化
+// 棋子移动由 executeMove 和 executeAIMove 直接处理位置更新
+// 配置变化（如棋子形状、随机旋转角度）将在下次开局时生效
 
 // 监听配置变化（通过轮询检测localStorage）
 let lastConfig = '';
@@ -290,10 +323,16 @@ const checkConfigChange = setInterval(() => {
     try {
       const config = JSON.parse(currentConfig);
       
-      // 检查棋子形状变化
+      // 检查棋子形状变化（下次开局生效）
       if (config.ui && config.ui.piece_shape && config.ui.piece_shape !== currentPieceShape) {
-        console.log('重新加载棋子形状');
-        updatePieceShape(config.ui.piece_shape);
+        console.log('检测到棋子形状变化（下次开局生效）:', config.ui.piece_shape);
+        // 不立即重建，等待下次开局时应用
+      }
+      
+      // 检查棋子文字随机旋转角度变化（下次开局生效）
+      if (config.ui && config.ui.piece_text_random_rotation !== undefined && config.ui.piece_text_random_rotation !== pieceTextRandomRotation) {
+        console.log('检测到棋子文字随机旋转角度变化（下次开局生效）:', config.ui.piece_text_random_rotation);
+        // 不立即重建，等待下次开局时应用
       }
       
       // 检查棋盘纹理变化
@@ -320,6 +359,14 @@ const handleStorageChange = (e: StorageEvent) => {
       if (config.ui && config.ui.piece_shape && config.ui.piece_shape !== currentPieceShape) {
         console.log('重新加载棋子形状');
         updatePieceShape(config.ui.piece_shape);
+      }
+      
+      // 检查棋子文字随机旋转角度变化
+      if (config.ui && config.ui.piece_text_random_rotation !== undefined && config.ui.piece_text_random_rotation !== pieceTextRandomRotation) {
+        console.log('检测到棋子文字随机旋转角度变化:', config.ui.piece_text_random_rotation);
+        pieceTextRandomRotation = config.ui.piece_text_random_rotation;
+        // 重建所有棋子以应用新的旋转角度
+        syncPiecesWithBoard(piecesGroup, scene, chessStore.board, currentPieceShape, opponentTextDirection, pieceTextRandomRotation);
       }
       
       // 检查棋盘纹理变化
@@ -358,24 +405,29 @@ onMounted(() => {
   
   // 加载配置并启动 AI 引擎
   loadConfig().then(config => {
-    console.log('✅ 配置加载完成，启用交互');
+    // console.log('✅ 配置加载完成，启用交互');
     
     // ✅ 设置配置就绪标志，允许用户操作
     isConfigReady.value = true;
     
     // 更新全局棋子形状配置
     currentPieceShape = config.ui.piece_shape;
-    console.log('棋子形状配置加载:', currentPieceShape);
+    // console.log('棋子形状配置加载:', currentPieceShape);
 
     const enginePath = config.engine.pikafish_path;
-    console.log('准备启动AI引擎，路径:', enginePath);
+    // console.log('准备启动AI引擎，路径:', enginePath);
     
     // 注意：startEngine 需要从 services 导入
     import('../../services/engineService').then(({ startEngine }) => {
       return startEngine(enginePath);
     }).then(() => {
-      aiModule.setEngineStarted(true);
-      console.log('AI 引擎已就绪');
+      // 确保 aiModule 已初始化后再调用
+      if (aiModule) {
+        aiModule.setEngineStarted(true);
+        console.log('AI 引擎已就绪');
+      } else {
+        console.error('❌ aiModule 未初始化，无法设置引擎状态');
+      }
     }).catch(error => {
       console.error('启动 AI 引擎失败:', error);
     });

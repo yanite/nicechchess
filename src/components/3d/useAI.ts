@@ -25,13 +25,8 @@ export function useAI(
   async function triggerAIMove() {
     // 如果 AI 正在思考，不重复触发
     if (isAIThinking.value) {
-      console.log('AI 正在思考中，跳过本次触发');
       return;
     }
-    
-    console.log('=== 开始触发 AI 行棋 ===');
-    console.log('当前玩家:', chessStore.currentPlayer);
-    console.log('引擎已启动:', engineStarted);
     
     // 启动引擎（如果尚未启动）
     if (!engineStarted) {
@@ -41,7 +36,6 @@ export function useAI(
         const enginePath = config.engine.pikafish_path;
         await startEngine(enginePath);
         engineStarted = true;
-        console.log('AI 引擎已启动');
       } catch (error) {
         console.error('启动 AI 引擎失败:', error);
         return;
@@ -49,33 +43,14 @@ export function useAI(
     }
     
     isAIThinking.value = true;
-    console.log('AI 开始思考...');
     
     try {
       // 获取当前局面的 FEN
       const fen = chessStore.fen;
-      console.log('当前 FEN:', fen);
-      
-      // 打印棋盘状态用于调试
-      console.log('当前棋盘 (board[9]=红方, board[0]=黑方):');
-      for (let r = 9; r >= 0; r--) {
-        const rowPieces = chessStore.board[r].map(p => {
-          if (p === 0) return '.';
-          return p > 0 ? 'R' : 'B';
-        }).join(' ');
-        console.log(`  board[${r}]: ${rowPieces}`);
-      }
       
       // 请求 AI 最佳着法
-      console.log('调用 getBestMove...');
-      
-      // 获取当前玩家的 AI 等级
       const skillLevel = chessStore.getCurrentPlayerAILevel();
-      console.log('当前玩家 AI 等级:', skillLevel);
-      
-      // 获取引擎配置
       const config = chessStore.engineConfig;
-      console.log('引擎配置:', config);
       
       const bestMoveUCI = await getBestMove(
         fen, 
@@ -87,27 +62,16 @@ export function useAI(
         config.movetime         // 思考时间
       );
       
-      console.log('AI 选择着法:', bestMoveUCI);
-      console.log('着法长度:', bestMoveUCI.length);
-      
       // 转换 UCI 着法为内部坐标
-      console.log('开始转换坐标...');
       const [fromRow, fromCol, toRow, toCol] = UCIToMove(bestMoveUCI);
-      console.log(`UCI: ${bestMoveUCI} → 内部坐标: (${fromRow},${fromCol}) → (${toRow},${toCol})`);
-      console.log(`起始位置棋子: ${chessStore.board[fromRow][fromCol]} (${chessStore.board[fromRow][fromCol] > 0 ? '红方' : '黑方'})`);
-      console.log(`目标位置棋子: ${chessStore.board[toRow][toCol]}`);
       
       // 执行 AI 移动
-      console.log('执行 AI 移动...');
       executeAIMove(fromRow, fromCol, toRow, toCol);
-      console.log('AI 移动完成');
       
     } catch (error) {
       console.error('AI 行棋失败:', error);
-      console.error('错误堆栈:', error instanceof Error ? error.stack : 'N/A');
     } finally {
       isAIThinking.value = false;
-      console.log('=== AI 行棋流程结束 ===');
     }
   }
 
@@ -115,8 +79,6 @@ export function useAI(
    * 执行 AI 移动（更新 3D 场景）
    */
   function executeAIMove(fromRow: number, fromCol: number, toRow: number, toCol: number) {
-    console.log(`AI 移动: (${fromRow},${fromCol}) → (${toRow},${toCol})`);
-    
     // 验证 AI 着法是否符合规则
     const board = chessStore.board;
     if (!isValidMove(board, fromRow, fromCol, toRow, toCol)) {
@@ -124,7 +86,6 @@ export function useAI(
       console.error('当前棋盘状态:', board);
       return;
     }
-    console.log('AI 着法验证通过');
     
     // 找到 AI 要移动的棋子
     let aiPiece: THREE.Mesh | null = null;
@@ -197,7 +158,8 @@ export function useAI(
     }
     
     // 移动 AI 棋子（使用平滑动画）
-    const aiUserData = (aiPiece as THREE.Mesh).userData as any;
+    const aiMesh = aiPiece as THREE.Mesh;
+    const aiUserData = aiMesh.userData as any;
     aiUserData.row = toRow;
     aiUserData.col = toCol;
     
@@ -206,8 +168,16 @@ export function useAI(
     const targetX = startX + toCol * CELL_SIZE;
     const targetZ = startZ + toRow * CELL_SIZE;
     
+    // 保持 y 坐标不变（已在创建时正确设置）
+    const currentY = aiMesh.position.y;
+    
     // 使用平滑动画移动棋子（500ms）
-    animatePieceMove(aiPiece as THREE.Mesh, targetX, targetZ, 500);
+    animatePieceMove(aiMesh, targetX, targetZ, 500);
+    
+    // 确保动画结束后 y 坐标正确
+    setTimeout(() => {
+      aiMesh.position.y = currentY;
+    }, 500);
     
     // 延迟更新棋盘数据，等待动画完成
     setTimeout(() => {

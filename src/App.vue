@@ -106,11 +106,11 @@ async function validateAndFixWindowState(state: WindowState): Promise<WindowStat
     needsFix = true;
   }
   
-  if (needsFix) {
-    console.log('窗口状态已修正:', fixedState);
-  } else {
-    console.log('窗口状态验证通过');
-  }
+  // if (needsFix) {
+  //   console.log('窗口状态已修正:', fixedState);
+  // } else {
+  //   console.log('窗口状态验证通过');
+  // }
   
   return fixedState;
 }
@@ -153,7 +153,7 @@ async function restoreWindowState() {
     }
     
     let state: WindowState = JSON.parse(saved);
-    console.log('读取到保存的窗口状态:', state);
+    // console.log('读取到保存的窗口状态:', state);
     
     // 验证并修正窗口状态
     state = await validateAndFixWindowState(state);
@@ -167,11 +167,11 @@ async function restoreWindowState() {
         x: Math.round(state.x), 
         y: Math.round(state.y) 
       });
-      console.log('✓ 窗口位置已设置:', { x: state.x, y: state.y });
+      // console.log('✓ 窗口位置已设置:', { x: state.x, y: state.y });
       
       // 验证位置是否设置成功
-      const currentPos = await appWindow.outerPosition();
-      console.log('当前窗口位置:', { x: currentPos.x, y: currentPos.y });
+      // const currentPos = await appWindow.outerPosition();
+      // console.log('当前窗口位置:', { x: currentPos.x, y: currentPos.y });
     } catch (posError) {
       console.error('✗ 设置窗口位置失败:', posError);
     }
@@ -183,11 +183,11 @@ async function restoreWindowState() {
         width: Math.round(state.width), 
         height: Math.round(state.height) 
       });
-      console.log('✓ 窗口大小已设置:', { width: state.width, height: state.height });
+      // console.log('✓ 窗口大小已设置:', { width: state.width, height: state.height });
       
       // 验证大小是否设置成功
-      const currentSize = await appWindow.outerSize();
-      console.log('当前窗口大小:', { width: currentSize.width, height: currentSize.height });
+      // const currentSize = await appWindow.outerSize();
+      // console.log('当前窗口大小:', { width: currentSize.width, height: currentSize.height });
     } catch (sizeError) {
       console.error('✗ 设置窗口大小失败:', sizeError);
     }
@@ -207,7 +207,7 @@ onMounted(async () => {
   
   // 监听窗口移动和调整大小事件
   const appWindow = getCurrentWindow();
-  console.log('获取到appWindow对象:', appWindow);
+  // console.log('获取到appWindow对象:', appWindow);
   
   let unlistenMove: (() => void) | null = null;
   let unlistenResize: (() => void) | null = null;

@@ -3,6 +3,7 @@ import { Line2 } from 'three/examples/jsm/lines/Line2.js';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js';
 import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js';
+import { getFontString } from './usePieces';
 
 // 棋盘尺寸配置
 export const BOARD_WIDTH = 9;
@@ -148,7 +149,7 @@ export function createBoard(
   
   // 尝试加载纹理，如果失败则使用默认颜色
   try {
-    console.log('尝试加载棋盘纹理:', texturePath);
+    // console.log('尝试加载棋盘纹理:', texturePath);
     
     // 从路径中提取基础名称（不含扩展名和目录）
     const basePath = texturePath.replace(/\.(jpg|jpeg|png)$/i, '');
@@ -232,7 +233,7 @@ export function createBoard(
   const useWhiteLines = shouldUseWhiteLines(texturePath);
   const lineColor = useWhiteLines ? 0xFFFFFF : 0x000000;
   
-  console.log(`棋盘线条颜色: ${useWhiteLines ? '白色' : '黑色'} (纹理: ${texturePath})`);
+  // console.log(`棋盘线条颜色: ${useWhiteLines ? '白色' : '黑色'} (纹理: ${texturePath})`);
 
   // 绘制棋盘线
   drawBoardLines(boardGroup, container, lineMaterials, lineColor);
@@ -348,7 +349,7 @@ function drawBoardLines(
     ctx.fillRect(0, 0, 128, 128);
     
     // 绘制文字
-    ctx.font = 'bold 80px "KaiTi", "STKaiti", serif';
+    ctx.font = getFontString(80); // 使用自定义字体，自动回退到系统字体
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = textColor; // ✅ 使用传入的颜色
@@ -503,7 +504,7 @@ function drawBorderFrame(
     boardGroup.add(borderLine);
   });
   
-  console.log('✅ 已绘制外围包围框');
+  // console.log('✅ 已绘制外围包围框');
 }
 
 /**
@@ -535,8 +536,8 @@ function drawNumberLabels(
     ctx.fillStyle = 'rgba(0, 0, 0, 0)';
     ctx.fillRect(0, 0, 64, 64);
     
-    // 绘制文字
-    ctx.font = 'bold 48px "KaiTi", "STKaiti", sans-serif';
+    // 绘制文字（字体大小减半）
+    ctx.font = getFontString(24); // 使用自定义字体，自动回退到系统字体
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = color;
@@ -590,5 +591,5 @@ function drawNumberLabels(
     boardGroup.add(labelMesh);
   }
   
-  console.log(`✅ 已绘制数字标记（${useWhiteLines ? '白线白字' : '黑线黑字'}）`);
+  // console.log(`✅ 已绘制数字标记（${useWhiteLines ? '白线白字' : '黑线黑字'}）`);
 }
