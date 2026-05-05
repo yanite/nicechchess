@@ -47,3 +47,6 @@ build/
 # Config files that may contain sensitive info
 config.yaml
 *.config.js
+
+# Font extraction tools (keep original fonts locally)
+src/assets/fonts/sys/
