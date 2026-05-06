@@ -146,6 +146,7 @@ import { ref, computed, watch } from 'vue';
 import { useChessStore } from '../store/chessStore';
 import { detectAndParseNotation } from '../logic/chess/notation';
 import { listChessScores, readChessScore } from '../services/chessScoreService';
+import { toast } from '../utils/toast';
 
 const props = defineProps<{
   visible: boolean;
@@ -207,7 +208,7 @@ function selectScoreFile(filename: string) {
 // 加载并开局（Tab 1 的核心功能）
 async function loadAndStartGame() {
   if (!selectedScore.value) {
-    alert('请先选择一个棋谱文件');
+    toast.warning('请先选择一个棋谱文件');
     return;
   }
   
@@ -219,14 +220,15 @@ async function loadAndStartGame() {
     
     if (success) {
       console.log(`已成功加载棋谱: ${selectedScore.value}`);
+      toast.success('棋谱加载成功！');
       close();
       emit('imported');
     } else {
-      alert('棋谱导入失败，请检查文件格式是否正确');
+      toast.error('棋谱导入失败，请检查文件格式是否正确');
     }
   } catch (error) {
     console.error('加载棋谱失败:', error);
-    alert(`加载棋谱失败: ${error}`);
+    toast.error(`加载棋谱失败: ${error}`);
   }
 }
 
@@ -270,7 +272,7 @@ function onTextChange() {
   metadata.value = result.metadata;
 }
 
-// 导出当前对局
+// 导出当前对局（仅用于 Tab 2）
 function exportNotation() {
   const exported = chessStore.exportNotation();
   if (exported) {
@@ -282,38 +284,38 @@ function exportNotation() {
       metadata: []
     };
   } else {
-    alert('当前没有对局记录可导出');
+    toast.warning('当前没有对局记录可导出');
   }
 }
 
-// 导入棋谱
+// 导入棋谱（仅用于 Tab 2）
 function importNotation() {
   if (!notationText.value.trim()) {
-    alert('请输入或粘贴棋谱内容');
+    toast.warning('请输入或粘贴棋谱内容');
     return;
   }
   
   const success = chessStore.importNotation(notationText.value);
   
   if (success) {
-    alert('棋谱导入成功！');
+    toast.success('棋谱导入成功！');
     close();
     emit('imported');
   } else {
-    alert('棋谱导入失败，请检查格式是否正确');
+    toast.error('棋谱导入失败，请检查格式是否正确');
   }
 }
 
-// 复制到剪贴板
+// 复制到剪贴板（仅用于 Tab 2）
 async function copyToClipboard() {
   if (!notationText.value) return;
   
   try {
     await navigator.clipboard.writeText(notationText.value);
-    alert('已复制到剪贴板');
+    toast.success('已复制到剪贴板');
   } catch (error) {
     console.error('复制失败:', error);
-    alert('复制失败，请手动选择文本复制');
+    toast.error('复制失败，请手动选择文本复制');
   }
 }
 
