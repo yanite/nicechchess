@@ -125,11 +125,11 @@ function animatePieceMove(piece: THREE.Mesh, fromRow: number, fromCol: number, t
 /**
  * 执行棋子移动（带动画）
  */
-function executeMove(fromRow: number, fromCol: number, toRow: number, toCol: number) {
+function executeMove(fromRow: number, fromCol: number, toRow: number, toCol: number, piece?: THREE.Mesh) {
   const board = chessStore.board;
   
-  // 获取当前拖动的棋子
-  const draggedPiece = interaction ? interaction.getDraggedPiece() : null;
+  // 获取当前拖动的棋子或传入的棋子
+  const draggedPiece = piece || (interaction ? interaction.getDraggedPiece() : null);
   
   // 1. 生成检验函数（目前为空函数，总是返回 true）
   const validateMoveResult = true; // 简化验证
@@ -144,6 +144,7 @@ function executeMove(fromRow: number, fromCol: number, toRow: number, toCol: num
   
   // 确保 draggedPiece 存在
   if (!draggedPiece) {
+    console.warn('⚠️ executeMove: 没有找到要移动的棋子');
     return;
   }
   
