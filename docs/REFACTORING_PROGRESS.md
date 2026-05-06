@@ -138,16 +138,38 @@
 
 ---
 
+### 6. 适配器层（✅ 完成）
+**文件**: `src/ui/composables/useGameAdapter.ts`
+
+**内容**:
+- `useGameAdapter()` - 桥接旧Pinia store和新架构
+
+**职责**:
+- 提供统一的接口，屏蔽新旧架构差异
+- 支持渐进式迁移，降低风险
+- 保留对旧store的引用供高级用法
+
+**设计策略**:
+- ✅ 适配器模式，符合开闭原则
+- ✅ 向后兼容，不影响现有功能
+- ✅ 为后续完全迁移到新架构做准备
+
+**提交**: `22ff687` - 引入适配器层，桥接旧store和新架构
+
+---
+
 ## 🔄 正在进行的工作
 
-### 下一步：迁移现有代码使用新架构
+### 下一步：更新ChessBoard3D.vue使用新架构
 
 **任务清单**:
-1. [ ] 更新 `ChessBoard3D.vue` 使用 `useGame()` 替代 `useChessStore()`
-2. [ ] 创建 `BoardRenderer.ts` 分离Three.js渲染逻辑
-3. [ ] 更新AI服务使用新的GameState
-4. [ ] 移除旧的Pinia store（或保留作为过渡）
-5. [ ] 验证所有功能正常工作
+1. [x] 创建适配器层（已完成）
+2. [ ] 替换所有 `chessStore.xxx` 调用为 `gameAdapter.xxx`
+3. [ ] 移除对 Pinia store 的直接依赖
+4. [ ] 创建 `BoardRenderer.ts` 分离Three.js渲染逻辑
+5. [ ] 更新AI服务使用新的GameState
+6. [ ] 验证所有功能正常工作
+7. [ ] 删除旧的Pinia store（或保留作为过渡）
 
 **预期成果**:
 - ✅ ChessBoard3D.vue不再直接依赖Pinia
@@ -167,7 +189,7 @@
 - 避免Vue响应式系统的隐式依赖
 
 **实现**:
-```typescript
+```
 // 纯TS类提供subscribe方法
 const unsubscribe = gameState.subscribe((state) => {
   board.value = state.getBoard();
@@ -184,7 +206,7 @@ const { board, movePiece } = useGame();
 - 便于追踪状态变化
 
 **实现**:
-```typescript
+```
 getBoard(): Board {
   return this.board.map(row => [...row]); // 深拷贝
 }
