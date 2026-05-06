@@ -291,14 +291,26 @@ const moveHistoryText = computed(() => {
 async function jumpToMove(moveIndex: number | undefined) {
   if (moveIndex === undefined) return;
   
+  console.log('[App] jumpToMove called with index:', moveIndex, 'current:', chessStore.currentMoveIndex);
+  
   // 调用 store 的方法跳转到指定着法
   chessStore.jumpToMove(moveIndex);
   
+  console.log('[App] After jumpToMove, currentMoveIndex:', chessStore.currentMoveIndex);
+  
+  // 等待一小段时间确保 store 状态完全更新
+  await new Promise(resolve => setTimeout(resolve, 100));
+  
+  console.log('[App] Before sync, board state:', chessStore.board.map(row => row.join(',')));
+  
   // 同步 3D 棋盘状态（带动画）
   if (boardRef.value && boardRef.value.animateSyncBoardState) {
+    console.log('[App] Calling animateSyncBoardState');
     await boardRef.value.animateSyncBoardState();
+    console.log('[App] animateSyncBoardState completed');
   } else if (boardRef.value && boardRef.value.syncBoardState) {
     // 降级方案：如果没有动画版本，使用普通同步
+    console.log('[App] Calling syncBoardState (fallback)');
     boardRef.value.syncBoardState();
   }
 }

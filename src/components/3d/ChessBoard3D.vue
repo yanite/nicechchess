@@ -380,11 +380,16 @@ function syncBoardState() {
  * 同步棋盘状态（带动画）
  */
 async function animateSyncBoardState() {
+  console.log('[ChessBoard3D] animateSyncBoardState called');
+  
   // 获取当前着法索引
   const moveIndex = chessStore.currentMoveIndex;
+  console.log('[ChessBoard3D] currentMoveIndex:', moveIndex, 'moveHistory length:', gameAdapter.moveHistory.length);
   
   if (moveIndex >= 0 && moveIndex < gameAdapter.moveHistory.length) {
     const moveRecord = gameAdapter.moveHistory[moveIndex];
+    console.log('[ChessBoard3D] Processing move:', moveRecord);
+    
     const [fromRow, fromCol] = moveRecord.from;
     const [toRow, toCol] = moveRecord.to;
     const pieceType = moveRecord.piece;
@@ -405,8 +410,10 @@ async function animateSyncBoardState() {
     }
     
     if (!pieceMesh) {
+      console.log('[ChessBoard3D] Piece not found at from position, falling back to full sync');
       // 降级方案：直接同步
       syncPiecesWithBoard(piecesGroup, scene, gameAdapter.board, currentPieceShape, opponentTextDirection, pieceTextRandomRotation);
+      console.log('[ChessBoard3D] Full sync completed');
       return;
     }
     
@@ -429,8 +436,11 @@ async function animateSyncBoardState() {
     
     // 动画完成后，同步所有棋子位置
     await new Promise(resolve => setTimeout(resolve, duration));
+    console.log('[ChessBoard3D] Animation completed, syncing all pieces');
     syncPiecesWithBoard(piecesGroup, scene, gameAdapter.board, currentPieceShape, opponentTextDirection, pieceTextRandomRotation);
+    console.log('[ChessBoard3D] animateSyncBoardState finished');
   } else {
+    console.log('[ChessBoard3D] No valid moveIndex, doing full sync');
     // 没有着法记录，直接同步
     syncPiecesWithBoard(piecesGroup, scene, gameAdapter.board, currentPieceShape, opponentTextDirection, pieceTextRandomRotation);
   }
