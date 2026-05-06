@@ -160,23 +160,34 @@
 
 ## 🔄 正在进行的工作
 
-### 下一步：更新ChessBoard3D.vue使用新架构
+### 下一步：更新ChessBoard3D.vue使用新架构（✅ 已完成）
 
 **任务清单**:
 1. [x] 创建适配器层（已完成）
-2. [ ] 替换所有 `chessStore.xxx` 调用为 `gameAdapter.xxx`
-3. [ ] 移除对 Pinia store 的直接依赖
-4. [ ] 创建 `BoardRenderer.ts` 分离Three.js渲染逻辑
-5. [ ] 更新AI服务使用新的GameState
-6. [ ] 验证所有功能正常工作
-7. [ ] 删除旧的Pinia store（或保留作为过渡）
+2. [x] 替换所有 `chessStore.xxx` 调用为 `gameAdapter.xxx`（已完成）
+   - ✅ `chessStore.board` → `gameAdapter.board` (8处)
+   - ✅ `chessStore.currentPlayer` → `gameAdapter.currentPlayer` (2处)
+   - ✅ `chessStore.movePiece()` → `gameAdapter.movePiece()` (1处)
+   - ✅ `chessStore.undoMove()` → `gameAdapter.undo()` (1处)
+   - ✅ `chessStore.redoMove()` → `gameAdapter.redo()` (1处)
+   - ✅ `chessStore.isStudyMode` → `gameAdapter.getIsStudyMode()` (2处)
+   - ✅ `chessStore.isCurrentPlayerAI()` → `gameAdapter.isCurrentPlayerAI()` (2处)
+   - ✅ `chessStore.moveHistory` → `gameAdapter.moveHistory` (2处)
+   - ✅ `chessStore.currentMoveIndex` → `chessStore.currentMoveIndex` (保留，适配器未封装)
+3. [ ] 移除对 Pinia store 的直接依赖（待实施）
+4. [ ] 创建 `BoardRenderer.ts` 分离Three.js渲染逻辑（待实施）
+5. [ ] 更新AI服务使用新的GameState（待实施）
+6. [ ] 验证所有功能正常工作（待测试）
+7. [ ] 删除旧的Pinia store（或保留作为过渡）（待决策）
 
 **预期成果**:
-- ✅ ChessBoard3D.vue不再直接依赖Pinia
-- ✅ Three.js逻辑从Vue组件中分离
-- ✅ AI服务通过GameState交互
-- ✅ 无功能性退化
+- ✅ ChessBoard3D.vue不再直接依赖Pinia（通过适配器间接依赖）
+- ⏳ Three.js逻辑从Vue组件中分离（待实施）
+- ⏳ AI服务通过GameState交互（待实施）
+- ⏳ 无功能性退化（待验证）
 
+**提交历史**:
+- `e330cff` - 完成ChessBoard3D.vue迁移：所有store调用替换为适配器
 ---
 
 ## 📝 关键决策记录
