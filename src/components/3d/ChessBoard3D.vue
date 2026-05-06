@@ -437,18 +437,18 @@ async function animateSyncBoardState() {
     await animatePieceMove(pieceMesh, fromRow, fromCol, toRow, toCol, duration);
     
     console.log('[ChessBoard3D] After animation - position:', pieceMesh.position.x, pieceMesh.position.z);
-    console.log('[ChessBoard3D] Before userData update - row:', (pieceMesh as any).userData.row, 'col:', (pieceMesh as any).userData.col);
-    
+    console.log('[ChessBoard3D] Before sync - userData:', (pieceMesh as any).userData);
     // 动画完成后，更新棋子的 userData 以反映新位置
     (pieceMesh as any).userData.row = toRow;
     (pieceMesh as any).userData.col = toCol;
     
-    console.log('[ChessBoard3D] After userData update - row:', (pieceMesh as any).userData.row, 'col:', (pieceMesh as any).userData.col);
+    console.log('[ChessBoard3D] After sync - userData:', (pieceMesh as any).userData);
     // 同步所有棋子位置（处理被吃掉的棋子等）
     await new Promise(resolve => setTimeout(resolve, duration));
     console.log('[ChessBoard3D] Calling syncPiecesWithBoard');
     syncPiecesWithBoard(piecesGroup, scene, gameAdapter.board, currentPieceShape, opponentTextDirection, pieceTextRandomRotation);
     console.log('[ChessBoard3D] After sync - piece position:', pieceMesh.position.x, pieceMesh.position.z);
+    console.log('[ChessBoard3D] After sync - userData:', (pieceMesh as any).userData);
     console.log('[ChessBoard3D] animateSyncBoardState finished');
   } else {
     console.log('[ChessBoard3D] No valid moveIndex, doing full sync');

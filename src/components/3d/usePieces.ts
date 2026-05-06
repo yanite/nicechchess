@@ -539,6 +539,10 @@ export function syncPiecesWithBoard(
           existing.mesh.position.x = startX + col * CELL_SIZE;
           existing.mesh.position.z = startZ + row * CELL_SIZE;
           
+          // ✅ 关键修复：更新userData以反映新位置
+          (existing.mesh as any).userData.row = row;
+          (existing.mesh as any).userData.col = col;
+          
           // 从待删除列表中移除
           const index = toRemove.indexOf(existing.mesh);
           if (index > -1) {
