@@ -127,111 +127,34 @@ function animatePieceMove(piece: THREE.Mesh, fromRow: number, fromCol: number, t
  * 执行棋子移动（带动画）
  */
 function executeMove(fromRow: number, fromCol: number, toRow: number, toCol: number, piece?: THREE.Mesh) {
-  const board = gameAdapter.board;
+  // 1. 更新棋盘数据 (Store)
+  const success = gameAdapter.movePiece(fromRow, fromCol, toRow, toCol);
   
-  // 获取当前拖动的棋子或传入的棋子
-  const draggedPiece = piece || (interaction ? interaction.getDraggedPiece() : null);
-  
-  // 1. 生成检验函数（目前为空函数，总是返回 true）
-  const validateMoveResult = true; // 简化验证
-  
-  if (!validateMoveResult) {
-    // 如果验证失败，将移动棋子放回原处
+  if (success) {
+    // ✅ 关键修复：直接使用chessStore.board确保获取最新的响应式数据
+    const board = chessStore.board;
+    
+    // 2. 更新3D场景（增量更新，保留随机旋转角度）
+    syncPiecesWithBoard(piecesGroup, scene, board, currentPieceShape, opponentTextDirection, pieceTextRandomRotation);
+    
+    // 3. 清除合法落点指示器
+    clearValidMoves();
+    
+    // 4. 检查是否形成将军或绝杀
+    checkCheckAndCheckmate(toRow, toCol);
+    
+    // 5. 如果当前玩家是 AI 且不在研究模式，触发 AI 行棋（支持双 AI）
+    if (!gameAdapter.getIsStudyMode() && gameAdapter.isCurrentPlayerAI()) {
+      setTimeout(() => {
+        if (aiModule) aiModule.triggerAIMove();
+      }, 1000);
+    }
+  } else {
+    // 如果移动失败（例如规则不允许），将棋子复位
+    const draggedPiece = piece || (interaction ? interaction.getDraggedPiece() : null);
     if (draggedPiece) {
       resetPiecePositionFunc(draggedPiece, currentPieceShape);
     }
-    return;
-  }
-  
-  // 确保 draggedPiece 存在
-  if (!draggedPiece) {
-    return;
-  }
-  
-  // 2. 如果目标位置有棋子，将目标棋子设置为死子并移到棋盘边上
-  const targetPiece = board[toRow][toCol];
-  if (targetPiece !== 0) {
-    // 找到目标位置的棋子（通过位置精确匹配）
-    let targetMesh: THREE.Mesh | null = null;
-    piecesGroup.children.forEach(child => {
-      if (child instanceof THREE.Mesh) {
-        const { row, col, isCaptured } = (child as any).userData;
-        // 找到目标位置且未被吃掉的棋子
-        if (row === toRow && col === toCol && !isCaptured) {
-          targetMesh = child;
-        }
-      }
-    });
-    
-    if (targetMesh) {
-      // 标记为死子
-      (targetMesh as THREE.Mesh).userData.isCaptured = true;
-      (targetMesh as THREE.Mesh).userData.row = -1;
-      (targetMesh as THREE.Mesh).userData.col = -1;
-      
-      const startX = -((BOARD_WIDTH - 1) * CELL_SIZE) / 2;
-      const startZ = -((BOARD_HEIGHT - 1) * CELL_SIZE) / 2;
-      const isRed = targetPiece > 0;
-      
-      // 统计该颜色已被吃的棋子数量
-      let capturedCount = 0;
-      piecesGroup.children.forEach(other => {
-        if (other instanceof THREE.Mesh) {
-          const otherData = other.userData as any;
-          if (otherData.isCaptured) {
-            const otherIsRed = otherData.piece > 0;
-            if (otherIsRed === isRed) {
-              capturedCount++;
-            }
-          }
-        }
-      });
-      
-      if (isRed) {
-        // 红方被吃的棋子放在棋盘左边
-        const leftBoundary = startX - CELL_SIZE * 1.5;
-        const offsetZ = capturedCount * CELL_SIZE * 0.75;
-        (targetMesh as THREE.Mesh).position.x = leftBoundary;
-        (targetMesh as THREE.Mesh).position.z = startZ + offsetZ;
-      } else {
-        // 黑方被吃的棋子放在棋盘右边
-        const rightBoundary = startX + (BOARD_WIDTH - 1) * CELL_SIZE + CELL_SIZE * 1.5;
-        const offsetZ = capturedCount * CELL_SIZE * 0.75;
-        (targetMesh as THREE.Mesh).position.x = rightBoundary;
-        (targetMesh as THREE.Mesh).position.z = startZ + offsetZ;
-      }
-      
-      // 被吃掉的棋子也需要保持正确的高度
-      (targetMesh as THREE.Mesh).position.y = 0.01; // 保持在棋盘平面上
-    }
-  }
-  
-  // 3. 更新拖动棋子的位置和状态
-  (draggedPiece as any).userData.row = toRow;
-  (draggedPiece as any).userData.col = toCol;
-  
-  const startX = -((BOARD_WIDTH - 1) * CELL_SIZE) / 2;
-  const startZ = -((BOARD_HEIGHT - 1) * CELL_SIZE) / 2;
-  draggedPiece.position.x = startX + toCol * CELL_SIZE;
-  draggedPiece.position.z = startZ + toRow * CELL_SIZE;
-  
-  // 恢复正确的y坐标（根据棋子形状）
-  resetPiecePositionFunc(draggedPiece, currentPieceShape);
-  
-  // 4. 更新棋盘数据
-  gameAdapter.movePiece(fromRow, fromCol, toRow, toCol);
-  
-  // 5. 清除合法落点指示器
-  clearValidMoves();
-  
-  // 6. 检查是否形成将军或绝杀
-  checkCheckAndCheckmate(toRow, toCol);
-  
-  // 7. 如果当前玩家是 AI 且不在研究模式，触发 AI 行棋（支持双 AI）
-  if (!gameAdapter.getIsStudyMode() && gameAdapter.isCurrentPlayerAI()) {
-    setTimeout(() => {
-      if (aiModule) aiModule.triggerAIMove();
-    }, 1000);
   }
 }
 
@@ -304,7 +227,10 @@ async function initScene() {
   boardGroup = createBoard(scene, boardTexturePath, container.value, lineMaterials);
 
   // 创建棋子
-  piecesGroup = createPieces(scene, gameAdapter.board, currentPieceShape, opponentTextDirection, pieceTextRandomRotation);
+  // ✅ 关键修复：直接使用chessStore.board确保获取最新的响应式数据
+  const board = chessStore.board;
+  
+  piecesGroup = createPieces(scene, board, currentPieceShape, opponentTextDirection, pieceTextRandomRotation);
   
   // 如果使用了自定义字体，需要刷新纹理以确保字体生效
   if (fontPath) {
@@ -369,10 +295,15 @@ function updatePieceShape(shape: 'cylinder' | 'standard') {
 }
 
 /**
- * 同步棋盘状态（立即更新）
+ * 同步棋盘状态（无动画）
  */
 function syncBoardState() {
-  syncPiecesWithBoard(piecesGroup, scene, gameAdapter.board, currentPieceShape, opponentTextDirection, pieceTextRandomRotation);
+  console.log('[ChessBoard3D] syncBoardState called');
+  
+  // ✅ 关键修复：直接使用chessStore.board确保获取最新的响应式数据
+  const board = chessStore.board;
+  
+  syncPiecesWithBoard(piecesGroup, scene, board, currentPieceShape, opponentTextDirection, pieceTextRandomRotation);
 }
 
 /**
@@ -381,9 +312,12 @@ function syncBoardState() {
 async function animateSyncBoardState() {
   console.log('[ChessBoard3D] animateSyncBoardState called');
   
+  // ✅ 关键修复：直接使用chessStore.board确保获取最新的响应式数据
+  const board = chessStore.board;
+  
   // 获取当前着法索引
   const moveIndex = chessStore.currentMoveIndex;
-  const moveHistory = gameAdapter.chessStore.moveHistory;
+  const moveHistory = chessStore.moveHistory;
   
   console.log('[ChessBoard3D] currentMoveIndex:', moveIndex, 'moveHistory length:', moveHistory.length);
   
@@ -395,18 +329,18 @@ async function animateSyncBoardState() {
     const [toRow, toCol] = moveRecord.to;
     const pieceType = moveRecord.piece;
     
-    console.log('[ChessBoard3D] Board state at target position:', gameAdapter.board[toRow][toCol]);
-    console.log('[ChessBoard3D] Board state at source position:', gameAdapter.board[fromRow][fromCol]);
+    console.log('[ChessBoard3D] Board state at target position:', board[toRow][toCol]);
+    console.log('[ChessBoard3D] Board state at source position:', board[fromRow][fromCol]);
     
     // ✅ 关键修复：不执行动画，直接完全重建场景
     console.log('[ChessBoard3D] Rebuilding all pieces (no animation for navigation)');
-    syncPiecesWithBoard(piecesGroup, scene, gameAdapter.board, currentPieceShape, opponentTextDirection, pieceTextRandomRotation);
+    syncPiecesWithBoard(piecesGroup, scene, board, currentPieceShape, opponentTextDirection, pieceTextRandomRotation);
     
     console.log('[ChessBoard3D] animateSyncBoardState finished');
   } else {
     console.log('[ChessBoard3D] No valid moveIndex, doing full sync');
     // 没有着法记录，直接同步
-    syncPiecesWithBoard(piecesGroup, scene, gameAdapter.board, currentPieceShape, opponentTextDirection, pieceTextRandomRotation);
+    syncPiecesWithBoard(piecesGroup, scene, board, currentPieceShape, opponentTextDirection, pieceTextRandomRotation);
   }
 }
 
@@ -429,8 +363,11 @@ function showValidMoves(pieceType: number, fromRow: number, fromCol: number) {
       // 跳过当前位置
       if (toRow === fromRow && toCol === fromCol) continue;
       
-      // 验证移动是否合法
-      if (isValidMove(gameAdapter.board, fromRow, fromCol, toRow, toCol)) {
+      // 验证移动合法性
+      // ✅ 关键修复：直接使用chessStore.board确保获取最新的响应式数据
+      const board = chessStore.board;
+      
+      if (isValidMove(board, fromRow, fromCol, toRow, toCol)) {
         // 创建绿色指示点
         const indicator = createValidMoveIndicator(toRow, toCol);
         scene.add(indicator);
