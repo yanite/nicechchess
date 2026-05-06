@@ -116,6 +116,92 @@ fn get_texture_files(texture_name: String) -> Result<Vec<String>, String> {
     Ok(files)
 }
 
+/// 列出棋谱目录下的所有棋谱文件
+#[tauri::command]
+fn list_chess_scores() -> Result<Vec<String>, String> {
+    use std::fs;
+    use std::env;
+    
+    // 尝试多个可能的路径
+    let possible_paths = vec![
+        PathBuf::from("src/assets/chess_score"),           // 开发模式
+        PathBuf::from("../src/assets/chess_score"),        // 从 target 目录向上
+        env::current_dir().unwrap_or_default().join("src/assets/chess_score"), // 当前工作目录
+    ];
+    
+    let mut chess_score_path = None;
+    
+    for path in possible_paths {
+        if path.exists() && path.is_dir() {
+            chess_score_path = Some(path);
+            break;
+        }
+    }
+    
+    if chess_score_path.is_none() {
+        eprintln!("未找到棋谱目录，返回空列表");
+        return Ok(vec![]);
+    }
+    
+    let chess_score_path = chess_score_path.unwrap();
+    println!("找到棋谱目录: {:?}", chess_score_path);
+    
+    let mut scores = vec![];
+    
+    for entry in fs::read_dir(&chess_score_path).map_err(|e| format!("读取目录失败: {}", e))? {
+        let entry = entry.map_err(|e| format!("读取条目失败: {}", e))?;
+        let path = entry.path();
+        
+        if path.is_file() {
+            if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
+                // 只返回 .txt 文件
+                if file_name.ends_with(".txt") {
+                    scores.push(file_name.to_string());
+                }
+            }
+        }
+    }
+    
+    scores.sort();
+    println!("扫描到的棋谱文件: {:?}", scores);
+    Ok(scores)
+}
+
+/// 读取指定棋谱文件的内容
+#[tauri::command]
+fn read_chess_score(filename: String) -> Result<String, String> {
+    use std::fs;
+    use std::env;
+    
+    // 尝试多个可能的路径
+    let possible_paths = vec![
+        PathBuf::from(format!("src/assets/chess_score/{}", filename)),
+        PathBuf::from(format!("../src/assets/chess_score/{}", filename)),
+        env::current_dir().unwrap_or_default().join(format!("src/assets/chess_score/{}", filename)),
+    ];
+    
+    let mut score_path = None;
+    
+    for path in possible_paths {
+        if path.exists() && path.is_file() {
+            score_path = Some(path);
+            break;
+        }
+    }
+    
+    if score_path.is_none() {
+        return Err(format!("未找到棋谱文件: {}", filename));
+    }
+    
+    let score_path = score_path.unwrap();
+    println!("读取棋谱文件: {:?}", score_path);
+    
+    let content = fs::read_to_string(&score_path)
+        .map_err(|e| format!("读取文件失败: {}", e))?;
+    
+    Ok(content)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -131,7 +217,9 @@ pub fn run() {
             get_best_move,
             update_engine_config,
             scan_texture_directories,
-            get_texture_files
+            get_texture_files,
+            list_chess_scores,
+            read_chess_score
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

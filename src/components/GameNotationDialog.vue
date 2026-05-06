@@ -7,6 +7,36 @@
       </div>
       
       <div class="dialog-content">
+        <!-- 棋谱文件列表区域 -->
+        <div class="score-list-section">
+          <h3>本地棋谱</h3>
+          <div class="score-list-container">
+            <div v-if="loadingScores" class="loading-indicator">
+              加载中...
+            </div>
+            <div v-else-if="chessScores.length === 0" class="empty-hint">
+              暂无棋谱文件
+            </div>
+            <div v-else class="score-list">
+              <div 
+                v-for="score in chessScores" 
+                :key="score"
+                class="score-item"
+                :class="{ selected: selectedScore === score }"
+                @click="selectScoreFile(score)"
+              >
+                <span class="score-icon">📄</span>
+                <span class="score-name">{{ score.replace('.txt', '') }}</span>
+              </div>
+            </div>
+          </div>
+          <div class="score-actions">
+            <button @click="loadSelectedScore" class="btn btn-load" :disabled="!selectedScore">
+              📂 加载选中棋谱
+            </button>
+          </div>
+        </div>
+
         <!-- 元数据显示区 -->
         <div v-if="metadata.length > 0" class="metadata-section">
           <h3>棋谱信息</h3>
@@ -58,6 +88,7 @@
         <div class="tips-section">
           <h4>💡 使用说明</h4>
           <ul>
+            <li><strong>加载棋谱：</strong>从左侧列表选择棋谱文件并点击"加载"</li>
             <li><strong>导出：</strong>将当前对局导出为标准棋谱格式</li>
             <li><strong>导入：</strong>从文本导入棋谱并开始新对局（自动识别元数据）</li>
             <li><strong>支持格式：</strong>如 "1.炮二平五 马8进7" 或 "相三进五 卒３进１"</li>
@@ -74,9 +105,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import { useChessStore } from '../store/chessStore';
 import { detectAndParseNotation } from '../logic/chess/notation';
+import { listChessScores, readChessScore } from '../services/chessScoreService';
 
 const props = defineProps<{
   visible: boolean;
@@ -99,6 +131,11 @@ const detectionResult = ref<{
   metadata: string[];
 } | null>(null);
 
+// 棋谱列表相关数据
+const chessScores = ref<string[]>([]);
+const selectedScore = ref<string | null>(null);
+const loadingScores = ref(false);
+
 // 计算属性
 const hasMoves = computed(() => {
   return chessStore.moveHistory.length > 0;
@@ -108,10 +145,53 @@ const canImport = computed(() => {
   return notationText.value.trim().length > 0 && detectionResult.value?.isNotation;
 });
 
+// 加载棋谱列表
+async function loadChessScoreList() {
+  loadingScores.value = true;
+  try {
+    chessScores.value = await listChessScores();
+    console.log('加载棋谱列表成功:', chessScores.value.length, '个文件');
+  } catch (error) {
+    console.error('加载棋谱列表失败:', error);
+    chessScores.value = [];
+  } finally {
+    loadingScores.value = false;
+  }
+}
+
+// 选择棋谱文件
+function selectScoreFile(filename: string) {
+  selectedScore.value = filename;
+}
+
+// 加载选中的棋谱
+async function loadSelectedScore() {
+  if (!selectedScore.value) {
+    alert('请先选择一个棋谱文件');
+    return;
+  }
+  
+  try {
+    const content = await readChessScore(selectedScore.value);
+    notationText.value = content;
+    
+    // 触发文本变化检测
+    onTextChange();
+    
+    alert(`已成功加载棋谱: ${selectedScore.value}`);
+  } catch (error) {
+    console.error('加载棋谱失败:', error);
+    alert(`加载棋谱失败: ${error}`);
+  }
+}
+
 // 监听对话框打开
 watch(() => props.visible, (newVal) => {
   if (newVal) {
-    // 打开对话框时，如果有历史记录，自动导出
+    // 打开对话框时加载棋谱列表
+    loadChessScoreList();
+    
+    // 如果有历史记录，自动导出
     if (chessStore.moveHistory.length > 0) {
       exportNotation();
     } else {
@@ -224,7 +304,7 @@ function close() {
   border-radius: 8px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
   width: 90%;
-  max-width: 700px;
+  max-width: 900px;
   max-height: 85vh;
   display: flex;
   flex-direction: column;
@@ -271,11 +351,92 @@ function close() {
   flex: 1;
   overflow-y: auto;
   padding: 20px;
+  display: flex;
+  gap: 20px;
+}
+
+/* 左侧棋谱列表区域 */
+.score-list-section {
+  width: 250px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.score-list-section h3 {
+  margin: 0 0 10px 0;
+  font-size: 16px;
+  color: #2c3e50;
+}
+
+.score-list-container {
+  flex: 1;
+  border: 2px solid #ddd;
+  border-radius: 6px;
+  overflow-y: auto;
+  max-height: 300px;
+  background: #f8f9fa;
+}
+
+.loading-indicator,
+.empty-hint {
+  padding: 20px;
+  text-align: center;
+  color: #7f8c8d;
+  font-size: 14px;
+}
+
+.score-list {
+  padding: 8px;
+}
+
+.score-item {
+  padding: 10px 12px;
+  margin-bottom: 4px;
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 2px solid transparent;
+}
+
+.score-item:hover {
+  background: #ecf0f1;
+  border-color: #3498db;
+}
+
+.score-item.selected {
+  background: #d5e8f3;
+  border-color: #2980b9;
+}
+
+.score-icon {
+  font-size: 18px;
+}
+
+.score-name {
+  font-size: 14px;
+  color: #2c3e50;
+  word-break: break-all;
+}
+
+.score-actions {
+  margin-top: 10px;
+}
+
+/* 右侧内容区域 */
+.right-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
 /* 元数据区域 */
 .metadata-section {
-  margin-bottom: 20px;
   padding: 15px;
   background: #f8f9fa;
   border-radius: 6px;
@@ -302,7 +463,9 @@ function close() {
 
 /* 编辑器区域 */
 .notation-editor-section {
-  margin-bottom: 20px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .notation-editor-section h3 {
@@ -322,6 +485,7 @@ function close() {
   line-height: 1.6;
   resize: vertical;
   transition: border-color 0.3s;
+  flex: 1;
 }
 
 .notation-textarea:focus {
@@ -363,7 +527,6 @@ function close() {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 10px;
-  margin-bottom: 20px;
 }
 
 .btn {
@@ -421,6 +584,18 @@ function close() {
 .btn-danger:hover:not(:disabled) {
   background: #c0392b;
   transform: translateY(-2px);
+}
+
+.btn-load {
+  background: #9b59b6;
+  color: white;
+  width: 100%;
+}
+
+.btn-load:hover:not(:disabled) {
+  background: #8e44ad;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(155, 89, 182, 0.3);
 }
 
 .btn-close {
