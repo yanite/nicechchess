@@ -683,15 +683,23 @@ onMounted(() => {
     // 左右方向键导航（悔棋/重做）
     if (event.key === 'ArrowLeft') {
       event.preventDefault();
-      gameAdapter.undo();
-      // 同步 3D 棋盘状态（带动画）
-      animateSyncBoardState();
+      const success = gameAdapter.undo();
+      if (success) {
+        // 延迟一小段时间确保 store 状态已更新，再同步 3D 场景
+        setTimeout(() => {
+          animateSyncBoardState();
+        }, 50);
+      }
       return;
     } else if (event.key === 'ArrowRight') {
       event.preventDefault();
-      gameAdapter.redo();
-      // 同步 3D 棋盘状态（带动画）
-      animateSyncBoardState();
+      const success = gameAdapter.redo();
+      if (success) {
+        // 延迟一小段时间确保 store 状态已更新，再同步 3D 场景
+        setTimeout(() => {
+          animateSyncBoardState();
+        }, 50);
+      }
       return;
     }
     

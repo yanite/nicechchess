@@ -65,6 +65,10 @@ export function useGameAdapter() {
     return chessStore.isStudyMode;
   }
   
+  function jumpToMove(targetIndex: number): void {
+    chessStore.jumpToMove(targetIndex);
+  }
+  
   return {
     // 响应式数据（直接从store获取）
     board: chessStore.board,
@@ -79,6 +83,7 @@ export function useGameAdapter() {
     reset,
     isCurrentPlayerAI,
     getIsStudyMode,
+    jumpToMove,
     
     // 原始store（供高级用法）
     chessStore,

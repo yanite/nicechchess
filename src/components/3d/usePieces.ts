@@ -468,7 +468,7 @@ export function createPieces(
 }
 
 /**
- * 同步3D棋子位置与store的棋盘状态（完全重建模式）
+ * 同步棋子与棋盘状态（增量更新，保留现有棋子的随机旋转角度）
  */
 export function syncPiecesWithBoard(
   piecesGroup: THREE.Group,
@@ -480,66 +480,88 @@ export function syncPiecesWithBoard(
 ) {
   if (!piecesGroup || !scene) return;
   
-  // 第一步：移除所有现有棋子
-  while(piecesGroup.children.length > 0) {
-    const child = piecesGroup.children[0];
-    piecesGroup.remove(child);
-    
-    // 释放资源
-    if (child instanceof THREE.Mesh) {
-      child.geometry.dispose();
-      if (Array.isArray(child.material)) {
-        child.material.forEach(mat => mat.dispose());
-      } else {
-        child.material.dispose();
-      }
-    }
-  }
-  
-  // 第二步：根据当前board状态重新创建所有棋子
   const startX = -((BOARD_WIDTH - 1) * CELL_SIZE) / 2;
   const startZ = -((BOARD_HEIGHT - 1) * CELL_SIZE) / 2;
   
-  // 记录每种棋子的计数，用于生成唯一编号
-  const pieceCounter: Record<string, number> = {};
+  // 第一步：收集当前所有棋子的信息（包括随机旋转偏移量）
+  const existingPieces = new Map<string, {
+    mesh: THREE.Mesh;
+    row: number;
+    col: number;
+    piece: number;
+    randomOffset: number;
+  }>();
+  
+  piecesGroup.children.forEach(child => {
+    if (child instanceof THREE.Mesh) {
+      const userData = (child as any).userData;
+      if (userData && userData.row !== undefined && userData.col !== undefined) {
+        // 使用行列和棋子类型作为唯一键来匹配位置上的棋子
+        const key = `${userData.row}_${userData.col}_${userData.piece}`;
+        existingPieces.set(key, {
+          mesh: child,
+          row: userData.row,
+          col: userData.col,
+          piece: userData.piece,
+          randomOffset: userData.randomRotationOffset || 0
+        });
+      }
+    }
+  });
+  
+  // 第二步：标记所有现有棋子为待删除
+  const toRemove: THREE.Mesh[] = [];
+  piecesGroup.children.forEach(child => {
+    if (child instanceof THREE.Mesh) {
+      toRemove.push(child);
+    }
+  });
+  
+  // 第三步：遍历当前board状态，复用或创建棋子
+  const usedKeys = new Set<string>();
   
   for (let row = 0; row < BOARD_HEIGHT; row++) {
     for (let col = 0; col < BOARD_WIDTH; col++) {
       const piece = board[row][col];
       if (piece !== null && piece !== 0) {
-        const pieceMesh = createPieceMesh(piece, row, col, pieceShape, opponentTextDirection, randomRotationRange);
+        const key = `${row}_${col}_${piece}`;
         
-        // 设置位置（x、y和z坐标）
-        pieceMesh.position.x = startX + col * CELL_SIZE;
-        pieceMesh.position.z = startZ + row * CELL_SIZE;
-        // y坐标已在 createPieceMesh 中根据棋子形状正确设置，无需再次修改
+        // 检查是否有相同位置的棋子可以复用
+        const existing = existingPieces.get(key);
         
-        // 生成唯一编号
-        const pieceName = getPieceChineseName(piece);
-        const colorPrefix = piece > 0 ? '红' : '黑';
-        const key = `${colorPrefix}${pieceName}`;
-        
-        if (!pieceCounter[key]) {
-          pieceCounter[key] = 0;
+        if (existing) {
+          // 复用现有棋子，保持其随机旋转角度
+          existing.mesh.position.x = startX + col * CELL_SIZE;
+          existing.mesh.position.z = startZ + row * CELL_SIZE;
+          
+          // 从待删除列表中移除
+          const index = toRemove.indexOf(existing.mesh);
+          if (index > -1) {
+            toRemove.splice(index, 1);
+          }
+          
+          usedKeys.add(key);
+        } else {
+          // 创建新棋子
+          const pieceMesh = createPieceMesh(piece, row, col, pieceShape, opponentTextDirection, randomRotationRange);
+          pieceMesh.position.x = startX + col * CELL_SIZE;
+          pieceMesh.position.z = startZ + row * CELL_SIZE;
+          piecesGroup.add(pieceMesh);
         }
-        pieceCounter[key]++;
-        
-        const uniqueId = `${key}${pieceCounter[key]}`;
-        
-        (pieceMesh as any).userData = { 
-          row, 
-          col, 
-          piece,
-          owner: piece > 0 ? '红' : '黑',
-          pieceName: pieceName,
-          uniqueId: uniqueId,
-          isCaptured: false
-        };
-        
-        piecesGroup.add(pieceMesh);
       }
     }
   }
+  
+  // 第四步：移除不再需要的棋子（被吃掉或移动走的）
+  toRemove.forEach(mesh => {
+    piecesGroup.remove(mesh);
+    mesh.geometry.dispose();
+    if (Array.isArray(mesh.material)) {
+      mesh.material.forEach(mat => mat.dispose());
+    } else {
+      mesh.material.dispose();
+    }
+  });
 }
 
 /**
