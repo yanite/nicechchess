@@ -376,7 +376,7 @@ function syncBoardState() {
 }
 
 /**
- * 同步棋盘状态（带动画）- 简化版本，先动画移动，然后完全重建场景
+ * 同步棋盘状态（带动画）- 简化版本，直接重建所有棋子
  */
 async function animateSyncBoardState() {
   console.log('[ChessBoard3D] animateSyncBoardState called');
@@ -395,54 +395,11 @@ async function animateSyncBoardState() {
     const [toRow, toCol] = moveRecord.to;
     const pieceType = moveRecord.piece;
     
-    // 在3D场景中查找要移动的棋子（通过起始位置精确匹配）
-    let pieceMesh: THREE.Mesh | undefined;
-    for (const child of piecesGroup.children) {
-      if (child instanceof THREE.Mesh) {
-        const userData = (child as any).userData;
-        if (userData.row === fromRow && 
-            userData.col === fromCol && 
-            userData.piece === pieceType &&
-            !userData.isCaptured) {
-          pieceMesh = child;
-          break;
-        }
-      }
-    }
+    console.log('[ChessBoard3D] Board state at target position:', gameAdapter.board[toRow][toCol]);
+    console.log('[ChessBoard3D] Board state at source position:', gameAdapter.board[fromRow][fromCol]);
     
-    if (!pieceMesh) {
-      console.log('[ChessBoard3D] Piece not found at from position, falling back to full sync');
-      // 降级方案：直接同步
-      syncPiecesWithBoard(piecesGroup, scene, gameAdapter.board, currentPieceShape, opponentTextDirection, pieceTextRandomRotation);
-      return;
-    }
-    
-    console.log('[ChessBoard3D] Found piece at', fromRow, fromCol, 'moving to', toRow, toCol);
-    
-    const startX = -((BOARD_WIDTH - 1) * CELL_SIZE) / 2;
-    const startZ = -((BOARD_HEIGHT - 1) * CELL_SIZE) / 2;
-    
-    // 保存目标位置的引用
-    const targetX = startX + toCol * CELL_SIZE;
-    const targetZ = startZ + toRow * CELL_SIZE;
-    const sourceX = startX + fromCol * CELL_SIZE;
-    const sourceZ = startZ + fromRow * CELL_SIZE;
-    
-    // 先设置棋子到起始位置
-    pieceMesh.position.x = sourceX;
-    pieceMesh.position.z = sourceZ;
-    
-    // 执行动画
-    const duration = 400;
-    await animatePieceMove(pieceMesh, fromRow, fromCol, toRow, toCol, duration);
-    
-    console.log('[ChessBoard3D] After animation - position:', pieceMesh.position.x, pieceMesh.position.z);
-    
-    // ✅ 关键修复：动画完成后，等待一小段时间让用户看到动画效果，然后完全重建场景
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
-    // ✅ 完全重建场景，确保所有棋子位置正确（包括被吃掉的棋子）
-    console.log('[ChessBoard3D] Rebuilding all pieces to ensure consistency');
+    // ✅ 关键修复：不执行动画，直接完全重建场景
+    console.log('[ChessBoard3D] Rebuilding all pieces (no animation for navigation)');
     syncPiecesWithBoard(piecesGroup, scene, gameAdapter.board, currentPieceShape, opponentTextDirection, pieceTextRandomRotation);
     
     console.log('[ChessBoard3D] animateSyncBoardState finished');
