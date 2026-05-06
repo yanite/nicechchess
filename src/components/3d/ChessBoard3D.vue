@@ -462,11 +462,17 @@ function showValidMoves(pieceType: number, fromRow: number, fromCol: number) {
   // 清除旧的指示点
   clearValidMoves();
   
+  // 调试日志：输出棋子类型信息
+  console.log('🟢 显示合法落点 - 棋子类型:', pieceType, '绝对值:', Math.abs(pieceType));
+  
   // 车、炮不需要指示点（类型 5 和 6，正负都表示车/炮）
   const absType = Math.abs(pieceType);
   if (absType === 5 || absType === 6) {
+    console.log('⛔ 车或炮，不显示指示点');
     return;
   }
+  
+  console.log('✅ 显示指示点');
   
   // 遍历所有可能的位置，找出合法落点
   for (let toRow = 0; toRow < BOARD_HEIGHT; toRow++) {
