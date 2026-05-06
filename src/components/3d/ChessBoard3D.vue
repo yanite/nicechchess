@@ -33,7 +33,8 @@ const chessStore = useChessStore();
 // 棋子形状配置
 let currentPieceShape: 'cylinder' | 'standard' = 'cylinder';
 let opponentTextDirection: 'down' | 'up' = 'down';
-let pieceTextRandomRotation: number = 0; // 棋子文字随机旋转角度（度）
+let pieceTextRandomRotation: number = 0;
+let currentMoveMode: 'drag' | 'click' = 'drag'; // 当前移动模式
 
 // Three.js 相关变量
 let scene: THREE.Scene;
@@ -247,6 +248,7 @@ async function initScene() {
     currentPieceShape = config.ui.piece_shape || 'cylinder';
     opponentTextDirection = config.ui.opponent_text_direction || 'down';
     pieceTextRandomRotation = (config.ui as any).piece_text_random_rotation ?? 0;
+    currentMoveMode = (config.ui as any).move_mode || 'drag';
   } catch (error) {
     console.warn('加载配置失败，使用默认纹理:', error);
   }
@@ -331,7 +333,8 @@ async function initScene() {
     () => aiModule ? aiModule.isAIThinking.value : false, // 传递 AI 思考状态
     () => isConfigReady.value, // ✅ 传递配置就绪状态
     showValidMoves, // ✅ 棋子选中回调，显示合法落点
-    clearValidMoves // ✅ 棋子取消选中回调，清除合法落点
+    clearValidMoves, // ✅ 棋子取消选中回调，清除合法落点
+    currentMoveMode // ✅ 传递移动模式
   );
 
   // 设置鼠标事件监听
@@ -570,6 +573,11 @@ const checkConfigChange = setInterval(() => {
         // 不立即重建，等待下次开局时应用
       }
       
+      // 检查移动模式变化
+      if (config.ui && config.ui.move_mode && config.ui.move_mode !== currentMoveMode) {
+        currentMoveMode = config.ui.move_mode;
+      }
+      
       // 检查棋盘纹理变化
       if (config.ui && config.ui.board_texture) {
         reloadBoardTexture(config.ui.board_texture);
@@ -598,6 +606,11 @@ const handleStorageChange = (e: StorageEvent) => {
         pieceTextRandomRotation = config.ui.piece_text_random_rotation;
         // 重建所有棋子以应用新的旋转角度
         syncPiecesWithBoard(piecesGroup, scene, chessStore.board, currentPieceShape, opponentTextDirection, pieceTextRandomRotation);
+      }
+      
+      // 检查移动模式变化
+      if (config.ui && config.ui.move_mode && config.ui.move_mode !== currentMoveMode) {
+        currentMoveMode = config.ui.move_mode;
       }
       
       // 检查棋盘纹理变化

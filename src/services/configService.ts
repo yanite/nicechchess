@@ -22,6 +22,7 @@ export interface UIConfig {
   piece_shape: 'cylinder' | 'standard';
   piece_text_random_rotation: number; // 棋子文字随机旋转角度范围（0-360度，0表示不随机）
   chess_font: '隶书' | '中國龍豪行書' | '系统楷体'; // 棋子字体选择
+  move_mode: 'drag' | 'click'; // 移动模式：拖动或两次点击
 }
 
 // 新建游戏默认配置
@@ -62,6 +63,7 @@ const DEFAULT_CONFIG: AppConfig = {
     piece_shape: 'cylinder',
     piece_text_random_rotation: 0, // 默认不随机旋转
     chess_font: '隶书', // 默认使用系统自带的隶书字体
+    move_mode: 'drag', // 默认拖动模式
   },
   new_game_defaults: {
     black_use_ai: true,
