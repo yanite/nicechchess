@@ -24,6 +24,8 @@
 | 14 | 柱型棋子嵌入棋盘及点击命中问题 | 🟡 中等 | ✅ 已修复 |
 | 15 | 棋子移动后重新嵌入棋盘 | 🟡 中等 | ✅ 已修复 |
 | 16 | 被吃掉的棋子不显示 | 🟡 中等 | ✅ 已修复 |
+| 17 | 车炮指示点过滤条件错误 | 🟡 中等 | ✅ 已修复 |
+| 18 | 两次点击模式棋子不移动 | 🔴 严重 | ✅ 已修复 |
 
 ---
 
@@ -1230,6 +1232,222 @@ normalCtx.fillText(pieceName, size / 2, size / 2 + normalVerticalOffset);
 
 ---
 
+### **Bug #17: 车炮指示点过滤条件错误**
+
+**发现时间：** 2026-05-06  
+**影响范围：** `src/components/3d/ChessBoard3D.vue` - [showValidMoves](file://v:\4_mydoc\tauri\nicechchess\src\components\3d\ChessBoard3D.vue#L460-L498) 函数  
+**严重程度：** 🟡 中等  
+**状态：** ✅ 已修复
+
+**问题描述：**
+- 点击车或炮时，仍然显示绿色合法落点指示器
+- 根据设计规范，车和炮因可移动位置多，不应显示指示点以避免视觉干扰
+- 之前的过滤条件使用了错误的棋子类型编号
+
+**根本原因：**
+- 误以为棋子类型编号是连续的（1-7），但实际 [PIECES](file://v:\4_mydoc\tauri\nicechchess\src\logic\chess\constants.ts#L6-L25) 常量定义为：
+  - 红方：帅=1, **车=2**, 马=3, **炮=4**, 仕=5, 相=6, 兵=7
+  - 黑方：将=-1, **车=-2**, 马=-3, **炮=-4**, 士=-5, 象=-6, 卒=-7
+- 之前的过滤条件写成了 `absType === 5 || absType === 6`（对应仕/士、相/象）
+- 正确的过滤条件应该是 `absType === 2 || absType === 4`（对应车、炮）
+
+**修复方案：**
+
+**文件：** `src/components/3d/ChessBoard3D.vue`
+
+```typescript
+// ❌ 之前：错误的类型判断
+if (absType === 5 || absType === 6) {  // 5=仕/士, 6=相/象
+  return;
+}
+
+// ✅ 现在：正确的类型判断
+if (absType === 2 || absType === 4) {  // 2=车, 4=炮
+  return;
+}
+```
+
+**完整代码上下文：**
+```typescript
+function showValidMoves(pieceType: number, row: number, col: number) {
+  clearValidMoves();
+  
+  const absType = Math.abs(pieceType);
+  
+  console.log('🟢 显示合法落点 - 棋子类型:', pieceType, '绝对值:', absType);
+  
+  // 车和炮不显示指示点（因为可移动位置太多）
+  if (absType === 2 || absType === 4) {  // 2=车, 4=炮
+    console.log('⛔ 车或炮，不显示指示点');
+    return;
+  }
+  
+  // ... 其他棋子的指示点逻辑
+}
+```
+
+**关键改进：**
+1. **准确的类型判断**：根据实际的 [PIECES](file://v:\4_mydoc\tauri\nicechchess\src\logic\chess\constants.ts#L6-L25) 常量定义修正过滤条件
+2. **统一的规则应用**：红方和黑方的车、炮都不显示指示点
+3. **优化的视觉效果**：绿点尺寸保持缩小一倍的状态
+
+**验证方法：**
+1. 启动应用，点击任意车（红方或黑方）
+2. 确认不显示任何绿色指示点
+3. 点击任意炮（红方或黑方）
+4. 确认不显示任何绿色指示点
+5. 点击其他棋子（马、相、仕、兵、将）
+6. 确认正常显示绿色指示点
+
+**相关提交：** 
+- `eb50ec7 修正车炮类型判断条件`
+
+**经验教训：**
+- ✅ 必须查阅实际的常量定义，不能凭直觉假设编号顺序
+- ✅ 使用 `Math.abs()` 统一处理正负号，简化类型判断逻辑
+- ✅ 添加调试日志帮助快速定位问题根源
+- ✅ 符合记忆规范：走法提示视觉规范要求仅对非滑动类棋子显示指示点
+
+---
+
+### **Bug #18: 两次点击模式棋子不移动**
+
+**发现时间：** 2026-05-06  
+**影响范围：** 
+- `src/components/3d/useInteraction.ts` - 交互逻辑
+- `src/components/3d/ChessBoard3D.vue` - [executeMove](file://v:\4_mydoc\tauri\nicechchess\src\components\3d\ChessBoard3D.vue#L127-L230) 函数  
+**严重程度：** 🔴 严重  
+**状态：** ✅ 已修复
+
+**问题描述：**
+- 在全局设置中启用"两次点击移动"模式后
+- 第一次点击棋子可以正常选中并抬起（y=1.2）
+- 第二次点击目标位置时，棋子没有移动到目标位置
+- 控制台显示移动验证通过，但棋子位置未更新
+
+**根本原因：**
+1. **[executeMove](file://v:\4_mydoc\tauri\nicechchess\src\components\3d\ChessBoard3D.vue#L127-L230) 依赖拖动状态**：
+   - [executeMove](file://v:\4_mydoc\tauri\nicechchess\src\components\3d\ChessBoard3D.vue#L127-L230) 函数通过 `interaction.getDraggedPiece()` 获取要移动的棋子
+   - 在两次点击模式下，使用的是局部变量 [selectedPiece](file://v:\4_mydoc\tauri\nicechchess\src\store\chessStore.ts#L54-L54)，而不是 `draggedPiece`
+   - 导致 `draggedPiece` 为 `null`，[executeMove](file://v:\4_mydoc\tauri\nicechchess\src\components\3d\ChessBoard3D.vue#L127-L230) 函数提前返回
+
+2. **回调函数签名不匹配**：
+   - [executeMoveCallback](file://v:\4_mydoc\tauri\nicechchess\src\components\3d\useInteraction.ts#L17-L17) 只接受坐标参数，不接受棋子对象
+   - 无法传递 [selectedPiece](file://v:\4_mydoc\tauri\nicechchess\src\store\chessStore.ts#L54-L54) 给 [executeMove](file://v:\4_mydoc\tauri\nicechchess\src\components\3d\ChessBoard3D.vue#L127-L230)
+
+**修复方案：**
+
+#### **1. 修改 executeMove 函数签名**
+
+**文件：** `src/components/3d/ChessBoard3D.vue`
+
+```typescript
+// ❌ 之前：只能从 interaction 获取棋子
+function executeMove(fromRow: number, fromCol: number, toRow: number, toCol: number) {
+  const draggedPiece = interaction ? interaction.getDraggedPiece() : null;
+  
+  if (!draggedPiece) {
+    return; // 提前返回，导致棋子不移动
+  }
+  // ...
+}
+
+// ✅ 现在：支持传入棋子对象参数
+function executeMove(fromRow: number, fromCol: number, toRow: number, toCol: number, piece?: THREE.Mesh) {
+  const draggedPiece = piece || (interaction ? interaction.getDraggedPiece() : null);
+  
+  if (!draggedPiece) {
+    console.warn('⚠️ executeMove: 没有找到要移动的棋子');
+    return;
+  }
+  // ...
+}
+```
+
+#### **2. 修改 useInteraction 回调类型**
+
+**文件：** `src/components/3d/useInteraction.ts`
+
+```typescript
+// ❌ 之前：只接受坐标参数
+export function useInteraction(
+  // ... other parameters ...
+  executeMoveCallback: (fromRow: number, fromCol: number, toRow: number, toCol: number) => void,
+  // ... other parameters ...
+) {
+  // ...
+}
+
+// ✅ 现在：添加可选的棋子参数
+export function useInteraction(
+  // ... other parameters ...
+  executeMoveCallback: (fromRow: number, fromCol: number, toRow: number, toCol: number, piece?: THREE.Mesh) => void,
+  // ... other parameters ...
+) {
+  // ...
+}
+```
+
+#### **3. 传递选中的棋子**
+
+**文件：** `src/components/3d/useInteraction.ts`
+
+**点击另一个棋子（吃子）：**
+```typescript
+if (isValidMove(chessStore.board, fromRow, fromCol, toRow, toCol)) {
+  // ✅ 传递 selectedPiece 参数
+  executeMoveCallback(fromRow, fromCol, toRow, toCol, selectedPiece);
+  
+  selectedPiece.position.y = 0.15;
+  selectedPiece = null;
+  if (onPieceDeselected) {
+    onPieceDeselected();
+  }
+}
+```
+
+**点击棋盘空白处：**
+```typescript
+if (isValidMove(chessStore.board, fromRow, fromCol, toRow, toCol)) {
+  // ✅ 传递 selectedPiece 参数
+  executeMoveCallback(fromRow, fromCol, toRow, toCol, selectedPiece);
+  
+  selectedPiece.position.y = 0.15;
+  selectedPiece = null;
+  if (onPieceDeselected) {
+    onPieceDeselected();
+  }
+}
+```
+
+**关键改进：**
+1. **灵活的参数设计**：[executeMove](file://v:\4_mydoc\tauri\nicechchess\src\components\3d\ChessBoard3D.vue#L127-L230) 支持可选的棋子参数
+2. **正确的数据传递**：两次点击模式传递 [selectedPiece](file://v:\4_mydoc\tauri\nicechchess\src\store\chessStore.ts#L54-L54) 给回调函数
+3. **向后兼容**：拖动模式不传参数，仍然使用 `interaction.getDraggedPiece()`
+4. **清晰的降级策略**：优先使用传入的参数，其次使用 interaction 的状态
+
+**验证方法：**
+1. 在设置中将移动模式改为"两次点击移动"
+2. 第一次点击棋子，确认棋子高高抬起（y=1.2）并显示绿色落点指示器
+3. 第二次点击目标位置（可以是空白格或对方棋子）
+4. 确认棋子成功移动到目标位置
+5. 切换回"拖动棋子"模式，确认拖动功能不受影响
+
+**相关提交：** 
+- `9d8b04d 添加棋子移动模式切换功能`
+- `28b9363 添加两次点击模式调试日志`
+- `61ae845 清理调试日志完成两次点击模式`
+- `d948fcd 修复两次点击模式棋子移动问题`
+
+**经验教训：**
+- ✅ 跨模块调用时，需要确保数据传递路径的完整性
+- ✅ 回调函数签名应该足够灵活，支持多种调用场景
+- ✅ 使用可选参数实现向后兼容，避免破坏现有功能
+- ✅ 调试日志对于诊断复杂交互问题非常有效
+- ✅ 符合记忆规范：配置管理规范要求所有全局选项保存到配置文件并持久化
+
+---
+
 ## 📚 **参考资料**
 
 - [UCI 协议规范](https://www.shredderchess.com/download/div/uci.zip)
@@ -1240,5 +1458,5 @@ normalCtx.fillText(pieceName, size / 2, size / 2 + normalVerticalOffset);
 
 ---
 
-**最后更新：** 2026-05-05  
+**最后更新：** 2026-05-06  
 **维护者：** ChChess 开发团队
