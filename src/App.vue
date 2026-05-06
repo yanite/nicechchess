@@ -6,6 +6,7 @@ import GameNotationDialog from './components/GameNotationDialog.vue';
 import { useChessStore } from './store/chessStore';
 import { computed, ref, onMounted, onUnmounted } from 'vue';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { toast } from './utils/toast';
 
 const chessStore = useChessStore();
 
@@ -307,27 +308,27 @@ function resetGame() {
   chessStore.resetGame();
 }
 
-// 悔棋（上一步）
+// 悔棋
 async function undoMove() {
-  chessStore.undoMove();
-  
-  // 同步 3D 棋盘状态（带动画）
-  if (boardRef.value && boardRef.value.animateSyncBoardState) {
+  const success = chessStore.undoMove();
+  if (success && boardRef.value) {
+    // 等待动画完成
     await boardRef.value.animateSyncBoardState();
-  } else if (boardRef.value && boardRef.value.syncBoardState) {
-    boardRef.value.syncBoardState();
+    toast.info('已悔棋');
+  } else if (!success) {
+    toast.warning('无法悔棋：已回到初始状态');
   }
 }
 
 // 重做（下一步）
 async function redoMove() {
-  chessStore.redoMove();
-  
-  // 同步 3D 棋盘状态（带动画）
-  if (boardRef.value && boardRef.value.animateSyncBoardState) {
+  const success = chessStore.redoMove();
+  if (success && boardRef.value) {
+    // 等待动画完成
     await boardRef.value.animateSyncBoardState();
-  } else if (boardRef.value && boardRef.value.syncBoardState) {
-    boardRef.value.syncBoardState();
+    toast.info('已重做');
+  } else if (!success) {
+    toast.warning('无法重做：已在最新状态');
   }
 }
 
@@ -397,6 +398,8 @@ function exitStudyMode() {
 
 // 处理新游戏确认
 function handleNewGame(config: NewGameConfig) {
+  console.log('新开局配置:', config);
+  
   // 设置玩家配置
   chessStore.setPlayers(config.blackPlayer, config.redPlayer);
   
@@ -405,10 +408,17 @@ function handleNewGame(config: NewGameConfig) {
   
   // 如果红方是AI，延迟触发AI行棋（红方先手）
   if (config.redPlayer.useAI) {
+    console.log('红方使用AI，等级:', config.redPlayer.aiLevel);
     setTimeout(() => {
       // ChessBoard3D组件会自动检测并触发AI
+      console.log('触发红方AI行棋');
     }, 1000);
   }
+  
+  // 显示 Toast 提示
+  const blackInfo = `${config.blackPlayer.name}${config.blackPlayer.useAI ? ` (AI Lv.${config.blackPlayer.aiLevel})` : ''}`;
+  const redInfo = `${config.redPlayer.name}${config.redPlayer.useAI ? ` (AI Lv.${config.redPlayer.aiLevel})` : ''}`;
+  toast.success(`新游戏开始！\n黑方：${blackInfo}\n红方：${redInfo}`);
 }
 
 </script>
