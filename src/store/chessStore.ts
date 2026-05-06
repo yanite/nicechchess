@@ -444,6 +444,10 @@ export const useChessStore = defineStore('chess', () => {
       let failedMoves: Array<{round: number, color: string, move: string}> = [];
       
       // 逐步应用每一步着法（失败不中断）
+      // 注意：这里暂时关闭研究模式，以便 movePiece 能正常记录着法到 history
+      const wasStudyMode = isStudyMode.value;
+      isStudyMode.value = false;
+
       for (const move of notation.moves) {
         // 应用红方着法
         if (move.red && currentPlayer.value === 'red') {
@@ -479,10 +483,18 @@ export const useChessStore = defineStore('chess', () => {
         );
       }
       
-      // 导入成功后进入研究模式
+      // 关键修复：将所有着法执行完毕后，重置 currentMoveIndex 到初始状态
+      // 这样用户可以按右键逐步查看着法
+      currentMoveIndex.value = -1;
+      
+      // 重置棋盘到初始状态
+      board.value = initBoard();
+      currentPlayer.value = 'red';
+      
+      // 启用研究模式
       isStudyMode.value = true;
 
-      console.log('已启用研究模式，不再自动记录着法');
+      console.log(`已启用研究模式，导入 ${moveHistory.value.length} 步着法，当前索引: ${currentMoveIndex.value}`);
       
       return true;  // 只要格式正确就返回成功
     } catch (error) {
