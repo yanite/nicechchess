@@ -17,6 +17,7 @@ import {
   exportGameNotation,
   detectAndParseNotation
 } from '../logic/chess/notation';
+import { toast } from '../utils/toast';
 
 // 着法记录接口
 export interface MoveRecord {
@@ -469,21 +470,18 @@ export const useChessStore = defineStore('chess', () => {
       
       // 显示执行结果摘要
       if (failCount > 0) {
-        // 弹出提示
-        alert(
-          `棋谱导入完成！\n\n` +
-          `✅ 成功执行: ${successCount} 步\n` +
-          `⚠️ 执行失败: ${failCount} 步\n\n` +
-          `失败原因可能是：\n` +
-          `- 棋子位置与着法不匹配\n` +
-          `- 存在变着或研究着法\n` +
-          `- 棋盘状态异常\n\n` +
-          `您可以继续查看棋谱或手动调整。`
+        // 使用 Toast 提示
+        const failedMovesText = failedMoves.slice(0, 5).map(m => `${m.round}.${m.color}: ${m.move}`).join('\n');
+        const moreText = failCount > 5 ? `\n...还有 ${failCount - 5} 步` : '';
+        
+        toast.warning(
+          `棋谱导入完成！成功: ${successCount} 步，失败: ${failCount} 步。${failedMovesText}${moreText}`
         );
       }
       
       // 导入成功后进入研究模式
       isStudyMode.value = true;
+
       console.log('已启用研究模式，不再自动记录着法');
       
       return true;  // 只要格式正确就返回成功
