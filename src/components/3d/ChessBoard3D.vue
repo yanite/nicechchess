@@ -15,7 +15,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue';
 import * as THREE from 'three';
-import { useChessStore } from '../../store/chessStore';
 import { loadConfig } from '../../services/configService';
 import { isValidMove } from '../../logic/chess/rules';
 
@@ -26,9 +25,11 @@ import { createPieces, syncPiecesWithBoard, resetPiecePosition as resetPiecePosi
 import { useInteraction } from './useInteraction';
 import { useAI } from './useAI';
 import { useGameState } from './useGameState';
+import { useGameAdapter } from '../../ui/composables/useGameAdapter'; // 新增：使用适配器
 
 const container = ref<HTMLDivElement | null>(null);
-const chessStore = useChessStore();
+const gameAdapter = useGameAdapter(); // 新增：使用适配器替代直接引用store
+const chessStore = gameAdapter.chessStore; // 保留引用供高级用法
 
 // 棋子形状配置
 let currentPieceShape: 'cylinder' | 'standard' = 'cylinder';
