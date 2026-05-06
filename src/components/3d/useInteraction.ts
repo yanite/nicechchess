@@ -75,10 +75,13 @@ export function useInteraction(
     if (event.button === 0) {
       // ✅ 两次点击模式：如果已选中棋子，检查是否点击了目标位置
       if (moveMode === 'click' && selectedPiece) {
+        console.log('🎯 两次点击模式 - 已选中棋子，检测目标位置');
+        
         // 递归检测所有子对象（包括文字贴图）
         const pieceIntersects = raycaster.intersectObjects(piecesGroup.children, true);
         
         if (pieceIntersects.length > 0) {
+          console.log('📍 点击了棋子');
           // 点击了另一个棋子，可能是吃子操作
           let targetObject = pieceIntersects[0].object as THREE.Mesh;
           
@@ -89,6 +92,7 @@ export function useInteraction(
           
           // 检查是否是死子
           if ((targetObject as any).userData.isCaptured) {
+            console.log('⛔ 目标是死子，忽略');
             return;
           }
           
@@ -98,8 +102,11 @@ export function useInteraction(
           const toRow = (targetObject as any).userData.row;
           const toCol = (targetObject as any).userData.col;
           
+          console.log(`🔄 尝试移动: (${fromRow},${fromCol}) → (${toRow},${toCol})`);
+          
           // 验证移动是否合法
           if (isValidMove(chessStore.board, fromRow, fromCol, toRow, toCol)) {
+            console.log('✅ 移动合法，执行移动');
             // 执行移动
             executeMoveCallback(fromRow, fromCol, toRow, toCol);
             
@@ -110,6 +117,7 @@ export function useInteraction(
               onPieceDeselected();
             }
           } else {
+            console.log('❌ 移动不合法，取消选择');
             // 移动不合法，取消选择
             selectedPiece.position.y = 0.15;
             selectedPiece = null;
@@ -118,6 +126,7 @@ export function useInteraction(
             }
           }
         } else {
+          console.log('📍 点击了棋盘空白处');
           // 点击了棋盘空白处，计算目标格子坐标
           const planeY = 0;
           const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -planeY);
@@ -133,12 +142,17 @@ export function useInteraction(
             const toCol = Math.round((intersectPoint.x - startX) / CELL_SIZE);
             const toRow = Math.round((intersectPoint.z - startZ) / CELL_SIZE);
             
+            console.log(`📐 目标格子: (${toRow}, ${toCol})`);
+            
             // 获取起始位置
             const fromRow = (selectedPiece as any).userData.row;
             const fromCol = (selectedPiece as any).userData.col;
             
+            console.log(`🔄 尝试移动: (${fromRow},${fromCol}) → (${toRow},${toCol})`);
+            
             // 验证移动是否合法
             if (isValidMove(chessStore.board, fromRow, fromCol, toRow, toCol)) {
+              console.log('✅ 移动合法，执行移动');
               // 执行移动
               executeMoveCallback(fromRow, fromCol, toRow, toCol);
               
@@ -149,6 +163,7 @@ export function useInteraction(
                 onPieceDeselected();
               }
             } else {
+              console.log('❌ 移动不合法，取消选择');
               // 移动不合法，取消选择
               selectedPiece.position.y = 0.15;
               selectedPiece = null;
@@ -223,8 +238,11 @@ export function useInteraction(
           controls.enabled = false;
         } else {
           // 两次点击模式
+          console.log('🎯 两次点击模式 - 选择棋子');
+          
           if (selectedPiece === selectedObject) {
             // 点击同一个棋子，取消选择
+            console.log('↩️ 点击同一个棋子，取消选择');
             selectedPiece = null;
             if (onPieceDeselected) {
               onPieceDeselected();
@@ -232,11 +250,13 @@ export function useInteraction(
           } else {
             // 如果有之前选中的棋子，先清除
             if (selectedPiece && onPieceDeselected) {
+              console.log('🔄 清除之前的选择');
               onPieceDeselected();
             }
             
             // 选中新棋子
             selectedPiece = selectedObject;
+            console.log(`✅ 选中棋子: (${(selectedObject as any).userData.row}, ${(selectedObject as any).userData.col})`);
             
             // 抬起棋子（更高）
             selectedObject.position.y = 1.2;
@@ -247,7 +267,7 @@ export function useInteraction(
             }
           }
         }
-        
+
         return;
       }
     }
