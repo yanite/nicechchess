@@ -480,9 +480,11 @@ export function syncPiecesWithBoard(
 ) {
   if (!piecesGroup || !scene) return;
   
+  console.log('[syncPiecesWithBoard] Starting sync, current children count:', piecesGroup.children.length);
+  
   const startX = -((BOARD_WIDTH - 1) * CELL_SIZE) / 2;
   const startZ = -((BOARD_HEIGHT - 1) * CELL_SIZE) / 2;
-  
+
   // 第一步：收集当前所有棋子的信息（包括随机旋转偏移量）
   const existingPieces = new Map<string, {
     mesh: THREE.Mesh;
@@ -509,6 +511,8 @@ export function syncPiecesWithBoard(
     }
   });
   
+  console.log('[syncPiecesWithBoard] Collected existing pieces:', existingPieces.size);
+  
   // 第二步：标记所有现有棋子为待删除
   const toRemove: THREE.Mesh[] = [];
   piecesGroup.children.forEach(child => {
@@ -530,6 +534,7 @@ export function syncPiecesWithBoard(
         const existing = existingPieces.get(key);
         
         if (existing) {
+          console.log('[syncPiecesWithBoard] Reusing piece at', row, col, 'key:', key);
           // 复用现有棋子，保持其随机旋转角度
           existing.mesh.position.x = startX + col * CELL_SIZE;
           existing.mesh.position.z = startZ + row * CELL_SIZE;
@@ -542,6 +547,7 @@ export function syncPiecesWithBoard(
           
           usedKeys.add(key);
         } else {
+          console.log('[syncPiecesWithBoard] Creating new piece at', row, col, 'key:', key);
           // 创建新棋子
           const pieceMesh = createPieceMesh(piece, row, col, pieceShape, opponentTextDirection, randomRotationRange);
           pieceMesh.position.x = startX + col * CELL_SIZE;
@@ -552,6 +558,7 @@ export function syncPiecesWithBoard(
     }
   }
   
+  console.log('[syncPiecesWithBoard] To remove count:', toRemove.length);
   // 第四步：移除不再需要的棋子（被吃掉或移动走的）
   toRemove.forEach(mesh => {
     piecesGroup.remove(mesh);

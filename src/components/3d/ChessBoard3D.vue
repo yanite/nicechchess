@@ -379,13 +379,17 @@ function syncBoardState() {
  * 同步棋盘状态（带动画）
  */
 async function animateSyncBoardState() {
-  // 获取当前着法索引和历史记录（统一从 adapter 获取）
-  const store = gameAdapter.chessStore;
-  const moveIndex = store.currentMoveIndex;
-  const moveHistory = store.moveHistory;
+  console.log('[ChessBoard3D] animateSyncBoardState called');
+  
+  // 获取当前着法索引
+  const moveIndex = chessStore.currentMoveIndex;
+  const moveHistory = gameAdapter.chessStore.moveHistory;
+  
+  console.log('[ChessBoard3D] currentMoveIndex:', moveIndex, 'moveHistory length:', moveHistory.length);
   
   if (moveIndex >= 0 && moveIndex < moveHistory.length) {
     const moveRecord = moveHistory[moveIndex];
+    console.log('[ChessBoard3D] Processing move:', moveRecord);
     
     const [fromRow, fromCol] = moveRecord.from;
     const [toRow, toCol] = moveRecord.to;
@@ -407,11 +411,14 @@ async function animateSyncBoardState() {
     }
     
     if (!pieceMesh) {
+      console.log('[ChessBoard3D] Piece not found at from position, falling back to full sync');
       // 降级方案：直接同步
       syncPiecesWithBoard(piecesGroup, scene, gameAdapter.board, currentPieceShape, opponentTextDirection, pieceTextRandomRotation);
       return;
     }
     
+    console.log('[ChessBoard3D] Found piece at', fromRow, fromCol, 'moving to', toRow, toCol);
+    console.log('[ChessBoard3D] Before animation - userData:', (pieceMesh as any).userData);
     const startX = -((BOARD_WIDTH - 1) * CELL_SIZE) / 2;
     const startZ = -((BOARD_HEIGHT - 1) * CELL_SIZE) / 2;
     
@@ -429,13 +436,22 @@ async function animateSyncBoardState() {
     const duration = 400;
     await animatePieceMove(pieceMesh, fromRow, fromCol, toRow, toCol, duration);
     
-    // 动画完成后，立即更新棋子的 userData 以反映新位置，确保 syncPiecesWithBoard 能正确匹配
+    console.log('[ChessBoard3D] After animation - position:', pieceMesh.position.x, pieceMesh.position.z);
+    console.log('[ChessBoard3D] Before userData update - row:', (pieceMesh as any).userData.row, 'col:', (pieceMesh as any).userData.col);
+    
+    // 动画完成后，更新棋子的 userData 以反映新位置
     (pieceMesh as any).userData.row = toRow;
     (pieceMesh as any).userData.col = toCol;
     
+    console.log('[ChessBoard3D] After userData update - row:', (pieceMesh as any).userData.row, 'col:', (pieceMesh as any).userData.col);
     // 同步所有棋子位置（处理被吃掉的棋子等）
+    await new Promise(resolve => setTimeout(resolve, duration));
+    console.log('[ChessBoard3D] Calling syncPiecesWithBoard');
     syncPiecesWithBoard(piecesGroup, scene, gameAdapter.board, currentPieceShape, opponentTextDirection, pieceTextRandomRotation);
+    console.log('[ChessBoard3D] After sync - piece position:', pieceMesh.position.x, pieceMesh.position.z);
+    console.log('[ChessBoard3D] animateSyncBoardState finished');
   } else {
+    console.log('[ChessBoard3D] No valid moveIndex, doing full sync');
     // 没有着法记录，直接同步
     syncPiecesWithBoard(piecesGroup, scene, gameAdapter.board, currentPieceShape, opponentTextDirection, pieceTextRandomRotation);
   }
