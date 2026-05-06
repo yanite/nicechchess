@@ -429,7 +429,11 @@ async function animateSyncBoardState() {
     const duration = 400;
     await animatePieceMove(pieceMesh, fromRow, fromCol, toRow, toCol, duration);
     
-    // 动画完成后，同步所有棋子位置
+    // 动画完成后，更新棋子的 userData 以反映新位置
+    (pieceMesh as any).userData.row = toRow;
+    (pieceMesh as any).userData.col = toCol;
+    
+    // 同步所有棋子位置（处理被吃掉的棋子等）
     await new Promise(resolve => setTimeout(resolve, duration));
     syncPiecesWithBoard(piecesGroup, scene, gameAdapter.board, currentPieceShape, opponentTextDirection, pieceTextRandomRotation);
   } else {
