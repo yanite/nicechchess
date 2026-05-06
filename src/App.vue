@@ -270,7 +270,12 @@ const moveHistoryText = computed(() => {
  * 点击着法时，跳转到该着法位置
  */
 async function jumpToMove(moveIndex: number | undefined) {
-  if (moveIndex === undefined) return;
+  console.log('[App] ========== jumpToMove CALLED ==========', moveIndex);
+  
+  if (moveIndex === undefined) {
+    console.log('[App] moveIndex is undefined, returning');
+    return;
+  }
   
   console.log('[App] jumpToMove called with index:', moveIndex, 'current:', chessStore.currentMoveIndex);
   
