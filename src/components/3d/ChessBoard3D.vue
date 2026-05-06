@@ -145,7 +145,6 @@ function executeMove(fromRow: number, fromCol: number, toRow: number, toCol: num
   
   // 确保 draggedPiece 存在
   if (!draggedPiece) {
-    console.warn('⚠️ executeMove: 没有找到要移动的棋子');
     return;
   }
   
@@ -252,7 +251,7 @@ async function initScene() {
     pieceTextRandomRotation = (config.ui as any).piece_text_random_rotation ?? 0;
     currentMoveMode = (config.ui as any).move_mode || 'drag';
   } catch (error) {
-    console.warn('加载配置失败，使用默认纹理:', error);
+    // 使用默认纹理
   }
 
   // 初始化场景
@@ -380,15 +379,13 @@ function syncBoardState() {
  * 同步棋盘状态（带动画）
  */
 async function animateSyncBoardState() {
-  console.log('[ChessBoard3D] animateSyncBoardState called');
+  // 获取当前着法索引和历史记录（统一从 adapter 获取）
+  const store = gameAdapter.chessStore;
+  const moveIndex = store.currentMoveIndex;
+  const moveHistory = store.moveHistory;
   
-  // 获取当前着法索引
-  const moveIndex = chessStore.currentMoveIndex;
-  console.log('[ChessBoard3D] currentMoveIndex:', moveIndex, 'moveHistory length:', gameAdapter.moveHistory.length);
-  
-  if (moveIndex >= 0 && moveIndex < gameAdapter.moveHistory.length) {
-    const moveRecord = gameAdapter.moveHistory[moveIndex];
-    console.log('[ChessBoard3D] Processing move:', moveRecord);
+  if (moveIndex >= 0 && moveIndex < moveHistory.length) {
+    const moveRecord = moveHistory[moveIndex];
     
     const [fromRow, fromCol] = moveRecord.from;
     const [toRow, toCol] = moveRecord.to;
@@ -410,10 +407,8 @@ async function animateSyncBoardState() {
     }
     
     if (!pieceMesh) {
-      console.log('[ChessBoard3D] Piece not found at from position, falling back to full sync');
       // 降级方案：直接同步
       syncPiecesWithBoard(piecesGroup, scene, gameAdapter.board, currentPieceShape, opponentTextDirection, pieceTextRandomRotation);
-      console.log('[ChessBoard3D] Full sync completed');
       return;
     }
     
@@ -436,11 +431,8 @@ async function animateSyncBoardState() {
     
     // 动画完成后，同步所有棋子位置
     await new Promise(resolve => setTimeout(resolve, duration));
-    console.log('[ChessBoard3D] Animation completed, syncing all pieces');
     syncPiecesWithBoard(piecesGroup, scene, gameAdapter.board, currentPieceShape, opponentTextDirection, pieceTextRandomRotation);
-    console.log('[ChessBoard3D] animateSyncBoardState finished');
   } else {
-    console.log('[ChessBoard3D] No valid moveIndex, doing full sync');
     // 没有着法记录，直接同步
     syncPiecesWithBoard(piecesGroup, scene, gameAdapter.board, currentPieceShape, opponentTextDirection, pieceTextRandomRotation);
   }
@@ -571,7 +563,7 @@ const checkConfigChange = setInterval(() => {
         reloadBoardTexture(config.ui.board_texture);
       }
     } catch (error) {
-      console.error('解析配置失败:', error);
+      // 忽略解析错误
     }
   } else if (lastConfig === '') {
     lastConfig = currentConfig;
@@ -606,7 +598,7 @@ const handleStorageChange = (e: StorageEvent) => {
         reloadBoardTexture(config.ui.board_texture);
       }
     } catch (error) {
-      console.error('解析配置失败:', error);
+      // 忽略解析错误
     }
   }
 };
@@ -650,10 +642,9 @@ onMounted(() => {
         aiModule.setEngineStarted(true);
       }
     }).catch(error => {
-      console.error('启动 AI 引擎失败:', error);
+      // 启动 AI 引擎失败
     });
   }).catch(error => {
-    console.warn('加载配置失败，使用默认配置:', error);
     // 即使配置加载失败，也启用交互（使用默认配置）
     isConfigReady.value = true;
   });

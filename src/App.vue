@@ -52,64 +52,45 @@ async function validateAndFixWindowState(state: WindowState): Promise<WindowStat
       screenHeight = currentMonitor.size.height;
     }
   } catch (error) {
-    console.warn('无法获取屏幕信息，使用默认值:', error);
+    // 忽略错误，使用默认屏幕尺寸
   }
   
   let fixedState = { ...state };
-  let needsFix = false;
   
   // 验证窗口大小
   if (fixedState.width < MIN_WINDOW_SIZE) {
-    console.warn(`窗口宽度过小 (${fixedState.width})，修正为 ${DEFAULT_WINDOW_WIDTH}`);
     fixedState.width = DEFAULT_WINDOW_WIDTH;
-    needsFix = true;
   }
   
   if (fixedState.height < MIN_WINDOW_SIZE) {
-    console.warn(`窗口高度过小 (${fixedState.height})，修正为 ${DEFAULT_WINDOW_HEIGHT}`);
     fixedState.height = DEFAULT_WINDOW_HEIGHT;
-    needsFix = true;
   }
   
   // 限制窗口最大尺寸为屏幕尺寸
   if (fixedState.width > screenWidth) {
-    console.warn(`窗口宽度超出屏幕 (${fixedState.width} > ${screenWidth})，修正为 ${screenWidth - 50}`);
     fixedState.width = screenWidth - 50;
-    needsFix = true;
   }
   
   if (fixedState.height > screenHeight) {
-    console.warn(`窗口高度超出屏幕 (${fixedState.height} > ${screenHeight})，修正为 ${screenHeight - 50}`);
     fixedState.height = screenHeight - 50;
-    needsFix = true;
   }
   
   // 验证窗口位置
   if (fixedState.x < 0 || fixedState.x >= screenWidth) {
-    console.warn(`窗口X坐标非法 (${fixedState.x})，修正为 ${DEFAULT_WINDOW_X}`);
     fixedState.x = DEFAULT_WINDOW_X;
-    needsFix = true;
   }
   
   if (fixedState.y < 0 || fixedState.y >= screenHeight) {
-    console.warn(`窗口Y坐标非法 (${fixedState.y})，修正为 ${DEFAULT_WINDOW_Y}`);
     fixedState.y = DEFAULT_WINDOW_Y;
-    needsFix = true;
   }
   
   // 确保窗口不会完全超出屏幕右侧或底部
   if (fixedState.x + fixedState.width > screenWidth) {
-    const newX = Math.max(0, screenWidth - fixedState.width - 10);
-    console.warn(`窗口会超出屏幕右侧，X坐标从 ${fixedState.x} 修正为 ${newX}`);
-    fixedState.x = newX;
-    needsFix = true;
+    fixedState.x = Math.max(0, screenWidth - fixedState.width - 10);
   }
   
   if (fixedState.y + fixedState.height > screenHeight) {
-    const newY = Math.max(0, screenHeight - fixedState.height - 10);
-    console.warn(`窗口会超出屏幕底部，Y坐标从 ${fixedState.y} 修正为 ${newY}`);
-    fixedState.y = newY;
-    needsFix = true;
+    fixedState.y = Math.max(0, screenHeight - fixedState.height - 10);
   }
   
   return fixedState;
@@ -137,7 +118,7 @@ function saveWindowStateDebounced() {
       
       localStorage.setItem(WINDOW_STATE_KEY, JSON.stringify(state));
     } catch (error) {
-      console.error('保存窗口状态失败:', error);
+      // 忽略保存错误
     }
   }, 500); // 500ms 防抖
 }
@@ -165,7 +146,7 @@ async function restoreWindowState() {
         y: Math.round(state.y) 
       });
     } catch (posError) {
-      console.error('设置窗口位置失败:', posError);
+      // 忽略设置位置错误
     }
     
     // 设置窗口大小（使用Tauri v2 PhysicalSize）
@@ -176,10 +157,10 @@ async function restoreWindowState() {
         height: Math.round(state.height) 
       });
     } catch (sizeError) {
-      console.error('设置窗口大小失败:', sizeError);
+      // 忽略设置大小错误
     }
   } catch (error) {
-    console.error('恢复窗口状态失败:', error);
+    // 忽略恢复状态错误
   }
 }
 
@@ -203,7 +184,7 @@ onMounted(async () => {
       saveWindowStateDebounced();
     });
   } catch (error) {
-    console.error('注册窗口监听器失败:', error);
+    // 忽略注册监听器错误
   }
   
   // 监听页面刷新/关闭事件，停止引擎
@@ -212,7 +193,7 @@ onMounted(async () => {
       const { stopEngine } = await import('./services/engineService');
       await stopEngine();
     } catch (error) {
-      console.error('停止引擎失败:', error);
+      // 忽略停止引擎错误
     }
   });
   
@@ -291,26 +272,17 @@ const moveHistoryText = computed(() => {
 async function jumpToMove(moveIndex: number | undefined) {
   if (moveIndex === undefined) return;
   
-  console.log('[App] jumpToMove called with index:', moveIndex, 'current:', chessStore.currentMoveIndex);
-  
   // 调用 store 的方法跳转到指定着法
   chessStore.jumpToMove(moveIndex);
-  
-  console.log('[App] After jumpToMove, currentMoveIndex:', chessStore.currentMoveIndex);
   
   // 等待一小段时间确保 store 状态完全更新
   await new Promise(resolve => setTimeout(resolve, 100));
   
-  console.log('[App] Before sync, board state:', chessStore.board.map(row => row.join(',')));
-  
   // 同步 3D 棋盘状态（带动画）
   if (boardRef.value && boardRef.value.animateSyncBoardState) {
-    console.log('[App] Calling animateSyncBoardState');
     await boardRef.value.animateSyncBoardState();
-    console.log('[App] animateSyncBoardState completed');
   } else if (boardRef.value && boardRef.value.syncBoardState) {
     // 降级方案：如果没有动画版本，使用普通同步
-    console.log('[App] Calling syncBoardState (fallback)');
     boardRef.value.syncBoardState();
   }
 }
@@ -351,8 +323,6 @@ function openSettings() {
 
 // 处理设置变更
 function onSettingsChanged(settings: any) {
-  console.log('设置已更改:', settings);
-  
   // 更新引擎配置到 store
   chessStore.setEngineConfig({
     threads: settings.engine.threads,
@@ -371,7 +341,6 @@ function onSettingsChanged(settings: any) {
       newValue: configData,
       oldValue: null
     }));
-    console.log('已触发配置更新事件');
   }
 }
 
@@ -392,7 +361,7 @@ async function handleNotationImported() {
     const { stopEngine } = await import('./services/engineService');
     await stopEngine();
   } catch (error) {
-    console.error('停止AI引擎失败:', error);
+    // 忽略停止引擎错误
   }
 }
 
@@ -410,8 +379,6 @@ function exitStudyMode() {
 
 // 处理新游戏确认
 function handleNewGame(config: NewGameConfig) {
-  console.log('新开局配置:', config);
-  
   // 设置玩家配置
   chessStore.setPlayers(config.blackPlayer, config.redPlayer);
   
@@ -420,10 +387,8 @@ function handleNewGame(config: NewGameConfig) {
   
   // 如果红方是AI，延迟触发AI行棋（红方先手）
   if (config.redPlayer.useAI) {
-    console.log('红方使用AI，等级:', config.redPlayer.aiLevel);
     setTimeout(() => {
       // ChessBoard3D组件会自动检测并触发AI
-      console.log('触发红方AI行棋');
     }, 1000);
   }
   
