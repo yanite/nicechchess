@@ -25,8 +25,8 @@
       </div>
       
       <div class="dialog-content">
-        <!-- Tab 1: 本地棋谱 -->
-        <div v-if="activeTab === 'local'" class="tab-content">
+        <!-- Tab 1: 本地棋谱（直接加载） -->
+        <div v-if="activeTab === 'local'" class="tab-content local-tab">
           <div class="score-list-section">
             <div class="section-header">
               <h3>可用棋谱文件</h3>
@@ -56,76 +56,81 @@
             </div>
             
             <div class="score-actions">
-              <button @click="loadSelectedScore" class="btn btn-load" :disabled="!selectedScore">
-                👁️ 预览选中棋谱
+              <button @click="loadAndStartGame" class="btn btn-load" :disabled="!selectedScore">
+                🔄 加载并开局
               </button>
             </div>
-          </div>
-        </div>
-
-        <!-- Tab 2: 导入棋谱 -->
-        <div v-if="activeTab === 'import'" class="tab-content">
-          <div class="import-section">
-            <div class="section-header">
-              <h3>手动输入或粘贴棋谱</h3>
-            </div>
             
-            <div class="import-tips">
-              <p><strong>支持的格式：</strong></p>
+            <div class="local-tab-tips">
+              <p><strong>💡 提示：</strong></p>
               <ul>
-                <li>标准着法：如 "炮二平五"、"马8进7"</li>
-                <li>回合格式：如 "1.炮二平五 马8进7"</li>
-                <li>支持简繁体混用</li>
+                <li>选择棋谱后点击"加载并开局"</li>
+                <li>将直接进入研究模式开始对局</li>
+                <li>不会显示预览，直接导入到棋盘</li>
               </ul>
             </div>
           </div>
         </div>
 
-        <!-- 公共区域：元数据显示 -->
-        <div v-if="metadata.length > 0" class="metadata-section">
-          <h3>棋谱信息</h3>
-          <div class="metadata-list">
-            <div v-for="(line, index) in metadata" :key="index" class="metadata-item">
-              {{ line }}
+        <!-- Tab 2: 导入棋谱（手动输入） -->
+        <div v-if="activeTab === 'import'" class="tab-content import-tab">
+          <!-- 元数据显示区 -->
+          <div v-if="metadata.length > 0" class="metadata-section">
+            <h3>棋谱信息</h3>
+            <div class="metadata-list">
+              <div v-for="(line, index) in metadata" :key="index" class="metadata-item">
+                {{ line }}
+              </div>
             </div>
           </div>
-        </div>
 
-        <!-- 公共区域：着法记录编辑器 -->
-        <div class="notation-editor-section">
-          <h3>着法记录</h3>
-          <textarea 
-            v-model="notationText" 
-            class="notation-textarea"
-            placeholder="在此粘贴或输入棋谱...&#10;例如：&#10;1.炮二平五 马8进7&#10;2.马二进三 车9平8"
-            @input="onTextChange"
-          ></textarea>
-          
-          <!-- 识别状态提示 -->
-          <div v-if="detectionResult" class="detection-status">
-            <span :class="['status-indicator', detectionResult.isNotation ? 'success' : 'warning']">
-              {{ detectionResult.isNotation ? '✓ 已识别为棋谱' : '⚠ 未检测到标准棋谱格式' }}
-            </span>
-            <span v-if="detectionResult.confidence > 0" class="confidence">
-              置信度: {{ (detectionResult.confidence * 100).toFixed(0) }}%
-            </span>
+          <!-- 着法记录编辑器 -->
+          <div class="notation-editor-section">
+            <h3>着法记录</h3>
+            <textarea 
+              v-model="notationText" 
+              class="notation-textarea"
+              placeholder="在此粘贴或输入棋谱...&#10;例如：&#10;1.炮二平五 马8进7&#10;2.马二进三 车9平8"
+              @input="onTextChange"
+            ></textarea>
+            
+            <!-- 识别状态提示 -->
+            <div v-if="detectionResult" class="detection-status">
+              <span :class="['status-indicator', detectionResult.isNotation ? 'success' : 'warning']">
+                {{ detectionResult.isNotation ? '✓ 已识别为棋谱' : '⚠ 未检测到标准棋谱格式' }}
+              </span>
+              <span v-if="detectionResult.confidence > 0" class="confidence">
+                置信度: {{ (detectionResult.confidence * 100).toFixed(0) }}%
+              </span>
+            </div>
           </div>
-        </div>
 
-        <!-- 公共区域：操作按钮 -->
-        <div class="action-buttons">
-          <button @click="exportNotation" class="btn btn-primary" :disabled="!hasMoves">
-            📤 导出当前对局
-          </button>
-          <button @click="importNotation" class="btn btn-success" :disabled="!canImport">
-            📥 导入并开局
-          </button>
-          <button @click="copyToClipboard" class="btn btn-secondary" :disabled="!notationText">
-            📋 复制到剪贴板
-          </button>
-          <button @click="clearNotation" class="btn btn-danger" :disabled="!notationText">
-            🗑️ 清空
-          </button>
+          <!-- 操作按钮区 -->
+          <div class="action-buttons">
+            <button @click="exportNotation" class="btn btn-primary" :disabled="!hasMoves">
+              📤 导出当前对局
+            </button>
+            <button @click="importNotation" class="btn btn-success" :disabled="!canImport">
+              📥 导入并开局
+            </button>
+            <button @click="copyToClipboard" class="btn btn-secondary" :disabled="!notationText">
+              📋 复制到剪贴板
+            </button>
+            <button @click="clearNotation" class="btn btn-danger" :disabled="!notationText">
+              🗑️ 清空
+            </button>
+          </div>
+          
+          <!-- 使用说明 -->
+          <div class="import-tips">
+            <h4>💡 使用说明</h4>
+            <ul>
+              <li><strong>导出：</strong>将当前对局导出为标准棋谱格式</li>
+              <li><strong>导入：</strong>从文本导入棋谱并开始新对局（自动识别元数据）</li>
+              <li><strong>支持格式：</strong>如 "1.炮二平五 马8进7" 或 "相三进五 卒３进１"</li>
+              <li><strong>自动识别：</strong>粘贴包含棋谱的文本时，会自动分离元数据和着法</li>
+            </ul>
+          </div>
         </div>
       </div>
 
@@ -199,8 +204,8 @@ function selectScoreFile(filename: string) {
   selectedScore.value = filename;
 }
 
-// 加载选中的棋谱（仅预览，不导入）
-async function loadSelectedScore() {
+// 加载并开局（Tab 1 的核心功能）
+async function loadAndStartGame() {
   if (!selectedScore.value) {
     alert('请先选择一个棋谱文件');
     return;
@@ -208,16 +213,17 @@ async function loadSelectedScore() {
   
   try {
     const content = await readChessScore(selectedScore.value);
-    notationText.value = content;
     
-    // 切换到导入 Tab，让用户看到内容
-    activeTab.value = 'import';
+    // 直接导入棋谱，不经过预览
+    const success = chessStore.importNotation(content);
     
-    // 触发文本变化检测
-    onTextChange();
-    
-    // 不自动导入，等待用户确认
-    console.log(`已加载棋谱: ${selectedScore.value}，请查看后点击"导入并开局"`);
+    if (success) {
+      console.log(`已成功加载棋谱: ${selectedScore.value}`);
+      close();
+      emit('imported');
+    } else {
+      alert('棋谱导入失败，请检查文件格式是否正确');
+    }
   } catch (error) {
     console.error('加载棋谱失败:', error);
     alert(`加载棋谱失败: ${error}`);
@@ -445,6 +451,19 @@ function close() {
   }
 }
 
+/* Tab 1: 本地棋谱样式 */
+.local-tab {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Tab 2: 导入棋谱样式 */
+.import-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
 /* 棋谱列表区域 */
 .score-list-section {
   display: flex;
@@ -541,20 +560,42 @@ function close() {
   justify-content: center;
 }
 
-/* 导入提示区域 */
-.import-section {
-  background: #fff3cd;
-  border-left: 4px solid #ffc107;
-  padding: 15px;
+.local-tab-tips {
+  background: #e3f2fd;
+  border-left: 4px solid #2196f3;
+  padding: 12px 15px;
   border-radius: 6px;
-}
-
-.import-tips {
   margin-top: 10px;
 }
 
-.import-tips p {
+.local-tab-tips p {
   margin: 0 0 8px 0;
+  font-size: 14px;
+  color: #1976d2;
+  font-weight: bold;
+}
+
+.local-tab-tips ul {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 13px;
+  color: #1976d2;
+}
+
+.local-tab-tips li {
+  margin-bottom: 4px;
+}
+
+/* 导入提示区域 */
+.import-tips {
+  padding: 15px;
+  background: #fff3cd;
+  border-radius: 6px;
+  border-left: 4px solid #ffc107;
+}
+
+.import-tips h4 {
+  margin: 0 0 10px 0;
   font-size: 14px;
   color: #856404;
 }
@@ -567,7 +608,7 @@ function close() {
 }
 
 .import-tips li {
-  margin-bottom: 4px;
+  margin-bottom: 5px;
 }
 
 /* 元数据区域 */
