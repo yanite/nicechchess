@@ -272,11 +272,18 @@ const moveHistoryText = computed(() => {
 async function jumpToMove(moveIndex: number | undefined) {
   if (moveIndex === undefined) return;
   
+  console.log('[App] jumpToMove called with index:', moveIndex, 'current:', chessStore.currentMoveIndex);
+  
   // 调用 store 的方法跳转到指定着法
   chessStore.jumpToMove(moveIndex);
   
+  console.log('[App] After jumpToMove, currentMoveIndex:', chessStore.currentMoveIndex);
+  console.log('[App] Board at (7,4):', chessStore.board[7][4], 'Board at (7,7):', chessStore.board[7][7]);
+  
   // 等待一小段时间确保 store 状态完全更新
   await new Promise(resolve => setTimeout(resolve, 100));
+  
+  console.log('[App] Before sync, Board at (7,4):', chessStore.board[7][4], 'Board at (7,7):', chessStore.board[7][7]);
   
   // 同步 3D 棋盘状态（带动画）
   if (boardRef.value && boardRef.value.animateSyncBoardState) {
