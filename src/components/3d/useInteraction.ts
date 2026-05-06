@@ -15,7 +15,7 @@ export function useInteraction(
   renderer: THREE.WebGLRenderer,
   container: HTMLDivElement | null,
   _pieceShape: 'cylinder' | 'standard', // 保留参数以备将来使用
-  executeMoveCallback: (fromRow: number, fromCol: number, toRow: number, toCol: number) => void,
+  executeMoveCallback: (fromRow: number, fromCol: number, toRow: number, toCol: number, piece?: THREE.Mesh) => void,
   resetPiecePositionFunc: (piece: THREE.Mesh) => void,
   isAIThinking: () => boolean, // AI 是否正在思考
   isConfigReady: () => boolean, // 配置是否已就绪
@@ -100,8 +100,8 @@ export function useInteraction(
           
           // 验证移动是否合法
           if (isValidMove(chessStore.board, fromRow, fromCol, toRow, toCol)) {
-            // 执行移动
-            executeMoveCallback(fromRow, fromCol, toRow, toCol);
+            // 执行移动，传递选中的棋子
+            executeMoveCallback(fromRow, fromCol, toRow, toCol, selectedPiece);
             
             // 清除选中状态
             selectedPiece.position.y = 0.15; // 恢复原始高度
@@ -139,8 +139,8 @@ export function useInteraction(
             
             // 验证移动是否合法
             if (isValidMove(chessStore.board, fromRow, fromCol, toRow, toCol)) {
-              // 执行移动
-              executeMoveCallback(fromRow, fromCol, toRow, toCol);
+              // 执行移动，传递选中的棋子
+              executeMoveCallback(fromRow, fromCol, toRow, toCol, selectedPiece);
               
               // 清除选中状态
               selectedPiece.position.y = 0.15;
