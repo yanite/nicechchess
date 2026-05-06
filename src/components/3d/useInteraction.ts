@@ -20,11 +20,13 @@ export function useInteraction(
   isAIThinking: () => boolean, // AI 是否正在思考
   isConfigReady: () => boolean, // 配置是否已就绪
   onPieceSelected?: (pieceType: number, row: number, col: number) => void, // 棋子选中回调
-  onPieceDeselected?: () => void // 棋子取消选中回调
+  onPieceDeselected?: () => void, // 棋子取消选中回调
+  moveMode: 'drag' | 'click' = 'drag' // 移动模式：拖动或点击
 ) {
   let draggedPiece: THREE.Mesh | null = null; // 当前拖动的棋子
   let isDragging = false; // 是否正在拖动
   let dragOffset = new THREE.Vector3(); // 拖动偏移量
+  let selectedPiece: THREE.Mesh | null = null; // 两次点击模式下选中的棋子
 
   /**
    * 鼠标按下事件 - 开始拖动棋子或相机控制
@@ -71,6 +73,95 @@ export function useInteraction(
     
     // 只响应左键
     if (event.button === 0) {
+      // ✅ 两次点击模式：如果已选中棋子，检查是否点击了目标位置
+      if (moveMode === 'click' && selectedPiece) {
+        // 递归检测所有子对象（包括文字贴图）
+        const pieceIntersects = raycaster.intersectObjects(piecesGroup.children, true);
+        
+        if (pieceIntersects.length > 0) {
+          // 点击了另一个棋子，可能是吃子操作
+          let targetObject = pieceIntersects[0].object as THREE.Mesh;
+          
+          // 如果点击的是文字贴图（子对象），找到父对象（棋子主体）
+          while (targetObject.parent && targetObject.parent !== piecesGroup) {
+            targetObject = targetObject.parent as THREE.Mesh;
+          }
+          
+          // 检查是否是死子
+          if ((targetObject as any).userData.isCaptured) {
+            return;
+          }
+          
+          // 获取起始和目标位置
+          const fromRow = (selectedPiece as any).userData.row;
+          const fromCol = (selectedPiece as any).userData.col;
+          const toRow = (targetObject as any).userData.row;
+          const toCol = (targetObject as any).userData.col;
+          
+          // 验证移动是否合法
+          if (isValidMove(chessStore.board, fromRow, fromCol, toRow, toCol)) {
+            // 执行移动
+            executeMoveCallback(fromRow, fromCol, toRow, toCol);
+            
+            // 清除选中状态
+            selectedPiece.position.y = 0.15; // 恢复原始高度
+            selectedPiece = null;
+            if (onPieceDeselected) {
+              onPieceDeselected();
+            }
+          } else {
+            // 移动不合法，取消选择
+            selectedPiece.position.y = 0.15;
+            selectedPiece = null;
+            if (onPieceDeselected) {
+              onPieceDeselected();
+            }
+          }
+        } else {
+          // 点击了棋盘空白处，计算目标格子坐标
+          const planeY = 0;
+          const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -planeY);
+          const intersectPoint = new THREE.Vector3();
+          
+          if (raycaster.ray.intersectPlane(plane, intersectPoint)) {
+            const BOARD_WIDTH = 9;
+            const BOARD_HEIGHT = 10;
+            const CELL_SIZE = 1;
+            const startX = -((BOARD_WIDTH - 1) * CELL_SIZE) / 2;
+            const startZ = -((BOARD_HEIGHT - 1) * CELL_SIZE) / 2;
+            
+            const toCol = Math.round((intersectPoint.x - startX) / CELL_SIZE);
+            const toRow = Math.round((intersectPoint.z - startZ) / CELL_SIZE);
+            
+            // 获取起始位置
+            const fromRow = (selectedPiece as any).userData.row;
+            const fromCol = (selectedPiece as any).userData.col;
+            
+            // 验证移动是否合法
+            if (isValidMove(chessStore.board, fromRow, fromCol, toRow, toCol)) {
+              // 执行移动
+              executeMoveCallback(fromRow, fromCol, toRow, toCol);
+              
+              // 清除选中状态
+              selectedPiece.position.y = 0.15;
+              selectedPiece = null;
+              if (onPieceDeselected) {
+                onPieceDeselected();
+              }
+            } else {
+              // 移动不合法，取消选择
+              selectedPiece.position.y = 0.15;
+              selectedPiece = null;
+              if (onPieceDeselected) {
+                onPieceDeselected();
+              }
+            }
+          }
+        }
+        
+        return;
+      }
+      
       // 递归检测所有子对象（包括文字贴图）
       const pieceIntersects = raycaster.intersectObjects(piecesGroup.children, true);
 
@@ -106,28 +197,57 @@ export function useInteraction(
           return;
         }
         
-        // 开始拖动
-        draggedPiece = selectedObject;
-        isDragging = true;
+        // ✅ 根据移动模式处理
+        if (moveMode === 'drag') {
+          // 拖动模式：立即开始拖动
+          draggedPiece = selectedObject;
+          isDragging = true;
+            
+          // 计算拖动偏移量（保持棋子与鼠标的相对位置）
+          const planeY = 0.5; // 拖动平面高度
+          const intersectPoint = new THREE.Vector3();
+          const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -planeY);
+          raycaster.ray.intersectPlane(plane, intersectPoint);
+            
+          dragOffset.copy(selectedObject.position).sub(intersectPoint);
+            
+          // 抬起棋子
+          selectedObject.position.y = 0.8;
           
-        // 计算拖动偏移量（保持棋子与鼠标的相对位置）
-        const planeY = 0.5; // 拖动平面高度
-        const intersectPoint = new THREE.Vector3();
-        const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -planeY);
-        raycaster.ray.intersectPlane(plane, intersectPoint);
-          
-        dragOffset.copy(selectedObject.position).sub(intersectPoint);
-          
-        // 抬起棋子
-        selectedObject.position.y = 0.8;
-        
-        // ✅ 触发棋子选中回调，显示合法落点指示器
-        if (onPieceSelected) {
-          onPieceSelected(piece, (selectedObject as any).userData.row, (selectedObject as any).userData.col);
+          // ✅ 触发棋子选中回调，显示合法落点指示器
+          if (onPieceSelected) {
+            onPieceSelected(piece, (selectedObject as any).userData.row, (selectedObject as any).userData.col);
+          }
+            
+          // 临时禁用控制器，避免冲突
+          controls.enabled = false;
+        } else {
+          // 两次点击模式
+          if (selectedPiece === selectedObject) {
+            // 点击同一个棋子，取消选择
+            selectedPiece = null;
+            if (onPieceDeselected) {
+              onPieceDeselected();
+            }
+          } else {
+            // 如果有之前选中的棋子，先清除
+            if (selectedPiece && onPieceDeselected) {
+              onPieceDeselected();
+            }
+            
+            // 选中新棋子
+            selectedPiece = selectedObject;
+            
+            // 抬起棋子（更高）
+            selectedObject.position.y = 1.2;
+            
+            // 触发棋子选中回调，显示合法落点指示器
+            if (onPieceSelected) {
+              onPieceSelected(piece, (selectedObject as any).userData.row, (selectedObject as any).userData.col);
+            }
+          }
         }
-          
-        // 临时禁用控制器，避免冲突
-        controls.enabled = false;
+        
         return;
       }
     }

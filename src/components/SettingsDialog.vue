@@ -140,6 +140,30 @@
           <span class="hint" style="display: block; margin-top: 5px; color: #9e9e9e;">💡 提示：部分字体需要自行下载并放入 resources/fonts 目录</span>
         </div>
 
+        <!-- 4.7. 棋子移动模式 -->
+        <div class="setting-item">
+          <label>棋子移动模式：</label>
+          <div class="custom-radio-group">
+            <div 
+              class="custom-radio" 
+              :class="{ active: settings.ui.move_mode === 'drag' }"
+              @click="setMoveMode('drag')"
+            >
+              <span class="radio-indicator"></span>
+              <span class="radio-label">拖动棋子（默认）</span>
+            </div>
+            <div 
+              class="custom-radio" 
+              :class="{ active: settings.ui.move_mode === 'click' }"
+              @click="setMoveMode('click')"
+            >
+              <span class="radio-indicator"></span>
+              <span class="radio-label">两次点击移动</span>
+            </div>
+          </div>
+          <span class="hint" style="display: block; margin-top: 5px; color: #9e9e9e;">💡 拖动模式：按住拖动释放；点击模式：第一次点击选中，第二次点击目标位置</span>
+        </div>
+
         <!-- 5. AI线程数 -->
         <div class="setting-item">
           <label>AI线程数：</label>
@@ -264,6 +288,7 @@ interface Settings {
     piece_shape: 'cylinder' | 'standard';
     piece_text_random_rotation: number;  // 棋子文字随机旋转角度（度）
     chess_font: '隶书' | '中國龍豪行書' | '系统楷体';  // 棋子字体
+    move_mode: 'drag' | 'click';  // 棋子移动模式：拖动或点击
   };
 }
 
@@ -291,6 +316,7 @@ const settings = ref<Settings>({
     piece_shape: 'cylinder',
     piece_text_random_rotation: 0, // 默认不随机旋转
     chess_font: '隶书', // 默认使用系统自带的隶书字体
+    move_mode: 'drag',
   },
 });
 
@@ -314,6 +340,7 @@ async function loadSettings() {
     settings.value.ui.piece_shape = (config.ui as any).piece_shape || 'cylinder';
     settings.value.ui.piece_text_random_rotation = (config.ui as any).piece_text_random_rotation ?? 0;
     settings.value.ui.chess_font = (config.ui as any).chess_font || '隶书';
+    settings.value.ui.move_mode = (config.ui as any).move_mode || 'drag';
     
     // 从路径中提取纹理名称
     const textureMatch = settings.value.ui.board_texture.match(/textures\/([^/]+)/);
@@ -388,7 +415,8 @@ async function saveSettings() {
       opponent_text_direction: settings.value.ui.opponent_text_direction,
       piece_shape: settings.value.ui.piece_shape,
       piece_text_random_rotation: settings.value.ui.piece_text_random_rotation,
-      chess_font: settings.value.ui.chess_font
+      chess_font: settings.value.ui.chess_font,
+      move_mode: settings.value.ui.move_mode,
     };
     
     // 保存完整配置
@@ -455,6 +483,12 @@ function setPieceShape(shape: 'cylinder' | 'standard') {
 // 设置棋子字体
 function setChessFont(font: '隶书' | '中國龍豪行書' | '系统楷体') {
   settings.value.ui.chess_font = font;
+  saveSettings();
+}
+
+// 设置移动模式
+function setMoveMode(mode: 'drag' | 'click') {
+  settings.value.ui.move_mode = mode;
   saveSettings();
 }
 
