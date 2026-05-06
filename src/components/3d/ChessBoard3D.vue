@@ -17,6 +17,7 @@ import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue';
 import * as THREE from 'three';
 import { useChessStore } from '../../store/chessStore';
 import { loadConfig } from '../../services/configService';
+import { isValidMove } from '../../logic/chess/rules';
 
 // 导入模块化功能
 import { useScene } from './useScene';
@@ -44,6 +45,9 @@ let piecesGroup: THREE.Group;
 let raycaster: THREE.Raycaster;
 let mouse: THREE.Vector2;
 let lineMaterials: any[] = [];
+
+// 合法落点指示点
+let validMoveIndicators: THREE.Mesh[] = [];
 
 // 使用场景管理模块
 const sceneManager = useScene(container);
@@ -215,10 +219,13 @@ function executeMove(fromRow: number, fromCol: number, toRow: number, toCol: num
   // 4. 更新棋盘数据
   chessStore.movePiece(fromRow, fromCol, toRow, toCol);
   
-  // 5. 检查是否形成将军或绝杀
+  // 5. 清除合法落点指示器
+  clearValidMoves();
+  
+  // 6. 检查是否形成将军或绝杀
   checkCheckAndCheckmate(toRow, toCol);
   
-  // 6. 如果当前玩家是 AI 且不在研究模式，触发 AI 行棋（支持双 AI）
+  // 7. 如果当前玩家是 AI 且不在研究模式，触发 AI 行棋（支持双 AI）
   if (!chessStore.isStudyMode && chessStore.isCurrentPlayerAI()) {
     setTimeout(() => {
       if (aiModule) aiModule.triggerAIMove();
@@ -322,7 +329,9 @@ async function initScene() {
     executeMove,
     (piece) => resetPiecePositionFunc(piece, currentPieceShape),
     () => aiModule ? aiModule.isAIThinking.value : false, // 传递 AI 思考状态
-    () => isConfigReady.value // ✅ 传递配置就绪状态
+    () => isConfigReady.value, // ✅ 传递配置就绪状态
+    showValidMoves, // ✅ 棋子选中回调，显示合法落点
+    clearValidMoves // ✅ 棋子取消选中回调，清除合法落点
   );
 
   // 设置鼠标事件监听
@@ -444,6 +453,97 @@ async function animateSyncBoardState() {
   
   // 动画完成后，同步整个棋盘状态（处理被吃掉的棋子等）
   syncPiecesWithBoard(piecesGroup, scene, chessStore.board, currentPieceShape, opponentTextDirection, pieceTextRandomRotation);
+}
+
+/**
+ * 显示合法落点指示器
+ */
+function showValidMoves(pieceType: number, fromRow: number, fromCol: number) {
+  // 清除旧的指示点
+  clearValidMoves();
+  
+  // 车、炮不需要指示点
+  const pieceName = getPieceName(pieceType);
+  if (pieceName === '车' || pieceName === '砲' || pieceName === '炮') {
+    return;
+  }
+  
+  // 遍历所有可能的位置，找出合法落点
+  for (let toRow = 0; toRow < BOARD_HEIGHT; toRow++) {
+    for (let toCol = 0; toCol < BOARD_WIDTH; toCol++) {
+      // 跳过当前位置
+      if (toRow === fromRow && toCol === fromCol) continue;
+      
+      // 检查是否是合法移动
+      if (isValidMove(chessStore.board, fromRow, fromCol, toRow, toCol)) {
+        // 创建绿色指示点
+        const indicator = createValidMoveIndicator(toRow, toCol);
+        scene.add(indicator);
+        validMoveIndicators.push(indicator);
+      }
+    }
+  }
+}
+
+/**
+ * 创建单个合法落点指示器（绿色圆点）
+ */
+function createValidMoveIndicator(row: number, col: number): THREE.Mesh {
+  const startX = -((BOARD_WIDTH - 1) * CELL_SIZE) / 2;
+  const startZ = -((BOARD_HEIGHT - 1) * CELL_SIZE) / 2;
+  
+  // 创建圆形几何体
+  const geometry = new THREE.CircleGeometry(CELL_SIZE * 0.15, 16);
+  const material = new THREE.MeshBasicMaterial({ 
+    color: 0x00ff00,  // 绿色
+    transparent: true,
+    opacity: 0.7,
+    depthWrite: false
+  });
+  
+  const indicator = new THREE.Mesh(geometry, material);
+  
+  // 设置位置（略高于棋盘）
+  indicator.position.x = startX + col * CELL_SIZE;
+  indicator.position.z = startZ + row * CELL_SIZE;
+  indicator.position.y = 0.02; // 略高于棋盘
+  
+  // 旋转使其平躺在棋盘上
+  indicator.rotation.x = -Math.PI / 2;
+  
+  return indicator;
+}
+
+/**
+ * 清除所有合法落点指示器
+ */
+function clearValidMoves() {
+  validMoveIndicators.forEach(indicator => {
+    scene.remove(indicator);
+    indicator.geometry.dispose();
+    (indicator.material as THREE.Material).dispose();
+  });
+  validMoveIndicators = [];
+}
+
+/**
+ * 获取棋子名称
+ */
+function getPieceName(pieceType: number): string {
+  if (pieceType > 0) {
+    // 红方
+    const redPieces: Record<number, string> = {
+      1: '帅', 2: '仕', 3: '相', 4: '马', 5: '车', 6: '炮', 7: '兵'
+    };
+    return redPieces[pieceType] || '';
+  } else {
+    // 黑方（负数）
+    const absType = Math.abs(pieceType);
+    const blackPieces: Record<number, string> = {
+      1: '将', 2: '士', 3: '象', 4: '马', 5: '车', 6: '炮', 7: '卒'
+    };
+    return blackPieces[absType] || '';
+  }
 }
 
 // 监听棋盘状态变化，同步3D视图
@@ -641,6 +741,9 @@ onBeforeUnmount(() => {
   
   // 清理提示定时器
   gameState.cleanup();
+  
+  // ✅ 清除合法落点指示器
+  clearValidMoves();
   
   // 清理鼠标事件监听
   interaction.cleanup();

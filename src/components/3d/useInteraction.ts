@@ -18,7 +18,9 @@ export function useInteraction(
   executeMoveCallback: (fromRow: number, fromCol: number, toRow: number, toCol: number) => void,
   resetPiecePositionFunc: (piece: THREE.Mesh) => void,
   isAIThinking: () => boolean, // AI 是否正在思考
-  isConfigReady: () => boolean // 配置是否已就绪
+  isConfigReady: () => boolean, // 配置是否已就绪
+  onPieceSelected?: (pieceType: number, row: number, col: number) => void, // 棋子选中回调
+  onPieceDeselected?: () => void // 棋子取消选中回调
 ) {
   let draggedPiece: THREE.Mesh | null = null; // 当前拖动的棋子
   let isDragging = false; // 是否正在拖动
@@ -118,6 +120,11 @@ export function useInteraction(
           
         // 抬起棋子
         selectedObject.position.y = 0.8;
+        
+        // ✅ 触发棋子选中回调，显示合法落点指示器
+        if (onPieceSelected) {
+          onPieceSelected(piece, (selectedObject as any).userData.row, (selectedObject as any).userData.col);
+        }
           
         // 临时禁用控制器，避免冲突
         controls.enabled = false;
@@ -204,6 +211,11 @@ export function useInteraction(
     // 重置拖动状态
     isDragging = false;
     draggedPiece = null;
+    
+    // ✅ 触发棋子取消选中回调，清除合法落点指示器
+    if (onPieceDeselected) {
+      onPieceDeselected();
+    }
     
     // 恢复控制器状态（根据当前修饰键状态）
     if (controls) {
