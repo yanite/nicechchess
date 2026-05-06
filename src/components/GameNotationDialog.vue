@@ -6,38 +6,82 @@
         <button class="close-btn" @click="close">×</button>
       </div>
       
+      <!-- Tab 页签导航 -->
+      <div class="tab-navigation">
+        <button 
+          class="tab-btn" 
+          :class="{ active: activeTab === 'local' }"
+          @click="activeTab = 'local'"
+        >
+          📁 本地棋谱
+        </button>
+        <button 
+          class="tab-btn" 
+          :class="{ active: activeTab === 'import' }"
+          @click="activeTab = 'import'"
+        >
+          📥 导入棋谱
+        </button>
+      </div>
+      
       <div class="dialog-content">
-        <!-- 棋谱文件列表区域 -->
-        <div class="score-list-section">
-          <h3>本地棋谱</h3>
-          <div class="score-list-container">
-            <div v-if="loadingScores" class="loading-indicator">
-              加载中...
+        <!-- Tab 1: 本地棋谱 -->
+        <div v-if="activeTab === 'local'" class="tab-content">
+          <div class="score-list-section">
+            <div class="section-header">
+              <h3>可用棋谱文件</h3>
+              <span class="file-count">{{ chessScores.length }} 个文件</span>
             </div>
-            <div v-else-if="chessScores.length === 0" class="empty-hint">
-              暂无棋谱文件
-            </div>
-            <div v-else class="score-list">
-              <div 
-                v-for="score in chessScores" 
-                :key="score"
-                class="score-item"
-                :class="{ selected: selectedScore === score }"
-                @click="selectScoreFile(score)"
-              >
-                <span class="score-icon">📄</span>
-                <span class="score-name">{{ score.replace('.txt', '') }}</span>
+            
+            <div class="score-list-container">
+              <div v-if="loadingScores" class="loading-indicator">
+                加载中...
+              </div>
+              <div v-else-if="chessScores.length === 0" class="empty-hint">
+                暂无棋谱文件<br>
+                <small>请将 .txt 格式的棋谱文件放入 src/assets/chess_score 目录</small>
+              </div>
+              <div v-else class="score-list">
+                <div 
+                  v-for="score in chessScores" 
+                  :key="score"
+                  class="score-item"
+                  :class="{ selected: selectedScore === score }"
+                  @click="selectScoreFile(score)"
+                >
+                  <span class="score-icon">📄</span>
+                  <span class="score-name">{{ score.replace('.txt', '') }}</span>
+                </div>
               </div>
             </div>
-          </div>
-          <div class="score-actions">
-            <button @click="loadSelectedScore" class="btn btn-load" :disabled="!selectedScore">
-              📂 加载选中棋谱
-            </button>
+            
+            <div class="score-actions">
+              <button @click="loadSelectedScore" class="btn btn-load" :disabled="!selectedScore">
+                👁️ 预览选中棋谱
+              </button>
+            </div>
           </div>
         </div>
 
-        <!-- 元数据显示区 -->
+        <!-- Tab 2: 导入棋谱 -->
+        <div v-if="activeTab === 'import'" class="tab-content">
+          <div class="import-section">
+            <div class="section-header">
+              <h3>手动输入或粘贴棋谱</h3>
+            </div>
+            
+            <div class="import-tips">
+              <p><strong>支持的格式：</strong></p>
+              <ul>
+                <li>标准着法：如 "炮二平五"、"马8进7"</li>
+                <li>回合格式：如 "1.炮二平五 马8进7"</li>
+                <li>支持简繁体混用</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- 公共区域：元数据显示 -->
         <div v-if="metadata.length > 0" class="metadata-section">
           <h3>棋谱信息</h3>
           <div class="metadata-list">
@@ -47,7 +91,7 @@
           </div>
         </div>
 
-        <!-- 棋谱编辑区 -->
+        <!-- 公共区域：着法记录编辑器 -->
         <div class="notation-editor-section">
           <h3>着法记录</h3>
           <textarea 
@@ -68,7 +112,7 @@
           </div>
         </div>
 
-        <!-- 操作按钮区 -->
+        <!-- 公共区域：操作按钮 -->
         <div class="action-buttons">
           <button @click="exportNotation" class="btn btn-primary" :disabled="!hasMoves">
             📤 导出当前对局
@@ -83,18 +127,6 @@
             🗑️ 清空
           </button>
         </div>
-
-        <!-- 提示信息 -->
-        <div class="tips-section">
-          <h4>💡 使用说明</h4>
-          <ul>
-            <li><strong>加载棋谱：</strong>从左侧列表选择棋谱文件并点击"加载"</li>
-            <li><strong>导出：</strong>将当前对局导出为标准棋谱格式</li>
-            <li><strong>导入：</strong>从文本导入棋谱并开始新对局（自动识别元数据）</li>
-            <li><strong>支持格式：</strong>如 "1.炮二平五 马8进7" 或 "相三进五 卒３进１"</li>
-            <li><strong>自动识别：</strong>粘贴包含棋谱的文本时，会自动分离元数据和着法</li>
-          </ul>
-        </div>
       </div>
 
       <div class="dialog-footer">
@@ -105,7 +137,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { useChessStore } from '../store/chessStore';
 import { detectAndParseNotation } from '../logic/chess/notation';
 import { listChessScores, readChessScore } from '../services/chessScoreService';
@@ -121,6 +153,9 @@ const emit = defineEmits<{
 }>();
 
 const chessStore = useChessStore();
+
+// Tab 页签状态
+const activeTab = ref<'local' | 'import'>('local');
 
 // 响应式数据
 const notationText = ref('');
@@ -164,7 +199,7 @@ function selectScoreFile(filename: string) {
   selectedScore.value = filename;
 }
 
-// 加载选中的棋谱
+// 加载选中的棋谱（仅预览，不导入）
 async function loadSelectedScore() {
   if (!selectedScore.value) {
     alert('请先选择一个棋谱文件');
@@ -175,10 +210,14 @@ async function loadSelectedScore() {
     const content = await readChessScore(selectedScore.value);
     notationText.value = content;
     
+    // 切换到导入 Tab，让用户看到内容
+    activeTab.value = 'import';
+    
     // 触发文本变化检测
     onTextChange();
     
-    alert(`已成功加载棋谱: ${selectedScore.value}`);
+    // 不自动导入，等待用户确认
+    console.log(`已加载棋谱: ${selectedScore.value}，请查看后点击"导入并开局"`);
   } catch (error) {
     console.error('加载棋谱失败:', error);
     alert(`加载棋谱失败: ${error}`);
@@ -191,7 +230,10 @@ watch(() => props.visible, (newVal) => {
     // 打开对话框时加载棋谱列表
     loadChessScoreList();
     
-    // 如果有历史记录，自动导出
+    // 默认显示本地棋谱 Tab
+    activeTab.value = 'local';
+    
+    // 如果有历史记录，自动导出到文本框（但不切换 Tab）
     if (chessStore.moveHistory.length > 0) {
       exportNotation();
     } else {
@@ -304,7 +346,7 @@ function close() {
   border-radius: 8px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
   width: 90%;
-  max-width: 900px;
+  max-width: 800px;
   max-height: 85vh;
   display: flex;
   flex-direction: column;
@@ -346,93 +388,186 @@ function close() {
   transform: scale(1.2);
 }
 
+/* Tab 导航 */
+.tab-navigation {
+  display: flex;
+  background: #f8f9fa;
+  border-bottom: 2px solid #dee2e6;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 12px 20px;
+  border: none;
+  background: transparent;
+  color: #6c757d;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s;
+  border-bottom: 3px solid transparent;
+}
+
+.tab-btn:hover {
+  background: #e9ecef;
+  color: #495057;
+}
+
+.tab-btn.active {
+  color: #3498db;
+  background: white;
+  border-bottom-color: #3498db;
+}
+
 /* 内容区 */
 .dialog-content {
   flex: 1;
   overflow-y: auto;
   padding: 20px;
   display: flex;
+  flex-direction: column;
   gap: 20px;
 }
 
-/* 左侧棋谱列表区域 */
-.score-list-section {
-  width: 250px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
+/* Tab 内容 */
+.tab-content {
+  animation: fadeIn 0.3s ease-in;
 }
 
-.score-list-section h3 {
-  margin: 0 0 10px 0;
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 棋谱列表区域 */
+.score-list-section {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.section-header h3 {
+  margin: 0;
   font-size: 16px;
   color: #2c3e50;
 }
 
+.file-count {
+  font-size: 13px;
+  color: #7f8c8d;
+  background: #ecf0f1;
+  padding: 4px 10px;
+  border-radius: 12px;
+}
+
 .score-list-container {
-  flex: 1;
   border: 2px solid #ddd;
   border-radius: 6px;
   overflow-y: auto;
-  max-height: 300px;
+  max-height: 350px;
   background: #f8f9fa;
 }
 
 .loading-indicator,
 .empty-hint {
-  padding: 20px;
+  padding: 30px 20px;
   text-align: center;
   color: #7f8c8d;
   font-size: 14px;
+  line-height: 1.8;
+}
+
+.empty-hint small {
+  display: block;
+  margin-top: 10px;
+  font-size: 12px;
+  color: #95a5a6;
 }
 
 .score-list {
-  padding: 8px;
+  padding: 10px;
 }
 
 .score-item {
-  padding: 10px 12px;
-  margin-bottom: 4px;
+  padding: 12px 15px;
+  margin-bottom: 6px;
   background: white;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   border: 2px solid transparent;
 }
 
 .score-item:hover {
   background: #ecf0f1;
   border-color: #3498db;
+  transform: translateX(5px);
 }
 
 .score-item.selected {
   background: #d5e8f3;
   border-color: #2980b9;
+  box-shadow: 0 2px 8px rgba(52, 152, 219, 0.2);
 }
 
 .score-icon {
-  font-size: 18px;
+  font-size: 20px;
 }
 
 .score-name {
   font-size: 14px;
   color: #2c3e50;
   word-break: break-all;
+  flex: 1;
 }
 
 .score-actions {
+  display: flex;
+  justify-content: center;
+}
+
+/* 导入提示区域 */
+.import-section {
+  background: #fff3cd;
+  border-left: 4px solid #ffc107;
+  padding: 15px;
+  border-radius: 6px;
+}
+
+.import-tips {
   margin-top: 10px;
 }
 
-/* 右侧内容区域 */
-.right-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
+.import-tips p {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  color: #856404;
+}
+
+.import-tips ul {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 13px;
+  color: #856404;
+}
+
+.import-tips li {
+  margin-bottom: 4px;
 }
 
 /* 元数据区域 */
@@ -463,20 +598,20 @@ function close() {
 
 /* 编辑器区域 */
 .notation-editor-section {
-  flex: 1;
   display: flex;
   flex-direction: column;
+  gap: 10px;
 }
 
 .notation-editor-section h3 {
-  margin: 0 0 10px 0;
+  margin: 0;
   font-size: 16px;
   color: #2c3e50;
 }
 
 .notation-textarea {
   width: 100%;
-  min-height: 200px;
+  min-height: 250px;
   padding: 12px;
   border: 2px solid #ddd;
   border-radius: 6px;
@@ -485,18 +620,17 @@ function close() {
   line-height: 1.6;
   resize: vertical;
   transition: border-color 0.3s;
-  flex: 1;
 }
 
 .notation-textarea:focus {
   outline: none;
   border-color: #3498db;
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
 }
 
 /* 检测状态 */
 .detection-status {
-  margin-top: 10px;
-  padding: 8px 12px;
+  padding: 10px 12px;
   background: #f0f0f0;
   border-radius: 4px;
   display: flex;
@@ -589,7 +723,8 @@ function close() {
 .btn-load {
   background: #9b59b6;
   color: white;
-  width: 100%;
+  padding: 12px 30px;
+  font-size: 15px;
 }
 
 .btn-load:hover:not(:disabled) {
@@ -606,31 +741,6 @@ function close() {
 
 .btn-close:hover {
   background: #2c3e50;
-}
-
-/* 提示区域 */
-.tips-section {
-  padding: 15px;
-  background: #fff3cd;
-  border-radius: 6px;
-  border-left: 4px solid #ffc107;
-}
-
-.tips-section h4 {
-  margin: 0 0 10px 0;
-  font-size: 14px;
-  color: #856404;
-}
-
-.tips-section ul {
-  margin: 0;
-  padding-left: 20px;
-  font-size: 13px;
-  color: #856404;
-}
-
-.tips-section li {
-  margin-bottom: 5px;
 }
 
 /* 底部 */
