@@ -214,7 +214,7 @@ export const useChessStore = defineStore('chess', () => {
    */
   function redoMove(): boolean {
     if (currentMoveIndex.value >= moveHistory.value.length - 1) {
-      console.log('无法重做：已在最新状态');
+      console.log('[Store] 无法重做：已在最新状态');
       return false;
     }
     
@@ -222,17 +222,27 @@ export const useChessStore = defineStore('chess', () => {
     currentMoveIndex.value++;
     const nextMove = moveHistory.value[currentMoveIndex.value];
     
-    if (!nextMove) return false;
+    if (!nextMove) {
+      console.log('[Store] nextMove is null');
+      return false;
+    }
+    
+    console.log('[Store] Redoing move:', nextMove);
+    console.log('[Store] Before redo - Board at', nextMove.from, ':', board.value[nextMove.from[0]][nextMove.from[1]]);
+    console.log('[Store] Before redo - Board at', nextMove.to, ':', board.value[nextMove.to[0]][nextMove.to[1]]);
     
     // 应用着法
     const { from, to, piece, captured } = nextMove;
     board.value[from[0]][from[1]] = PIECES.EMPTY;
     board.value[to[0]][to[1]] = piece;
     
+    console.log('[Store] After redo - Board at', from, ':', board.value[from[0]][from[1]]);
+    console.log('[Store] After redo - Board at', to, ':', board.value[to[0]][to[1]]);
+    
     // 切换行棋方
     currentPlayer.value = currentPlayer.value === 'red' ? 'black' : 'red';
     
-    // console.log('重做成功，当前索引:', currentMoveIndex.value);
+    console.log('[Store] Redo completed successfully');
     return true;
   }
 
