@@ -462,9 +462,9 @@ function showValidMoves(pieceType: number, fromRow: number, fromCol: number) {
   // 清除旧的指示点
   clearValidMoves();
   
-  // 车、炮不需要指示点
-  const pieceName = getPieceName(pieceType);
-  if (pieceName === '车' || pieceName === '砲' || pieceName === '炮') {
+  // 车、炮不需要指示点（类型 5 和 6，正负都表示车/炮）
+  const absType = Math.abs(pieceType);
+  if (absType === 5 || absType === 6) {
     return;
   }
   
@@ -492,8 +492,8 @@ function createValidMoveIndicator(row: number, col: number): THREE.Mesh {
   const startX = -((BOARD_WIDTH - 1) * CELL_SIZE) / 2;
   const startZ = -((BOARD_HEIGHT - 1) * CELL_SIZE) / 2;
   
-  // 创建圆形几何体
-  const geometry = new THREE.CircleGeometry(CELL_SIZE * 0.15, 16);
+  // 创建圆形几何体（半径缩小一倍，从 0.15 改为 0.075）
+  const geometry = new THREE.CircleGeometry(CELL_SIZE * 0.075, 16);
   const material = new THREE.MeshBasicMaterial({ 
     color: 0x00ff00,  // 绿色
     transparent: true,
