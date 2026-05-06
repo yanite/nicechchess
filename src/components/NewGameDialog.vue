@@ -127,6 +127,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import { loadConfig, saveConfig } from '../services/configService';
+import { toast } from '../utils/toast';
 
 // 玩家配置接口
 interface PlayerConfig {
@@ -183,17 +184,17 @@ function close() {
 async function confirm() {
   // 验证输入
   if (!blackPlayer.value.name.trim()) {
-    alert('请输入黑棋玩家名称');
+    toast.warning('请输入黑棋玩家名称');
     return;
   }
   
   if (!redPlayer.value.name.trim()) {
-    alert('请输入红棋玩家名称');
+    toast.warning('请输入红棋玩家名称');
     return;
   }
   
   if (timePerMove.value < 1 || timePerMove.value > 300) {
-    alert('每步棋用时必须在1-300秒之间');
+    toast.warning('每步棋用时必须在1-300秒之间');
     return;
   }
   
