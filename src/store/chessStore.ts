@@ -288,19 +288,28 @@ export const useChessStore = defineStore('chess', () => {
    * @param targetIndex 目标着法索引（从0开始）
    */
   function jumpToMove(targetIndex: number) {
+    console.log('[Store] jumpToMove called, targetIndex:', targetIndex, 'currentMoveIndex:', currentMoveIndex.value);
+    
     if (targetIndex < 0 || targetIndex >= moveHistory.value.length) {
+      console.log('[Store] Invalid targetIndex, returning');
       return;
     }
     
     // 如果目标在当前之前，需要撤销
     while (currentMoveIndex.value > targetIndex) {
+      console.log('[Store] Undoing move, currentMoveIndex:', currentMoveIndex.value);
       undoMove();
     }
     
     // 如果目标在当前之后，需要重做
     while (currentMoveIndex.value < targetIndex) {
-      redoMove();
+      console.log('[Store] Redoing move, currentMoveIndex:', currentMoveIndex.value, 'targetIndex:', targetIndex);
+      const success = redoMove();
+      console.log('[Store] Redo result:', success, 'new currentMoveIndex:', currentMoveIndex.value);
+      console.log('[Store] Board at (0,7):', board.value[0][7], 'Board at (0,8):', board.value[0][8]);
     }
+    
+    console.log('[Store] jumpToMove finished, final currentMoveIndex:', currentMoveIndex.value);
   }
 
   /**
