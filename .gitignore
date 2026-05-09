@@ -47,3 +47,5 @@ build/
 # Config files that may contain sensitive info
 config.yaml
 *.config.js
+
+portable-build/assets/pikafish
