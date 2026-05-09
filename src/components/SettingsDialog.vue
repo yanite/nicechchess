@@ -272,6 +272,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { loadConfig, saveConfig, scanTextureDirectories } from '../services/configService';
+import { open } from '@tauri-apps/plugin-dialog';
 
 interface Settings {
   engine: {
@@ -292,7 +293,7 @@ interface Settings {
   };
 }
 
-const props = defineProps<{
+defineProps<{
   visible: boolean;
 }>();
 
@@ -303,7 +304,7 @@ const emit = defineEmits<{
 
 const settings = ref<Settings>({
   engine: {
-    pikafish_path: 'public/pikafish/pikafish-vnni512.exe',
+    pikafish_path: 'assets/pikafish/pikafish-vnni512.exe',
     threads: Math.max(1, Math.floor(navigator.hardwareConcurrency || 4) / 2),  // CPU核心数的一半
     hash: 2048,
     calculation_mode: 'depth',
@@ -311,7 +312,7 @@ const settings = ref<Settings>({
     depth: 20,
   },
   ui: {
-    board_texture: 'src/assets/textures/tx1/wood_diff_1k.jpg',
+    board_texture: 'assets/textures/tx1/wood_diff_1k.jpg',
     opponent_text_direction: 'down',
     piece_shape: 'cylinder',
     piece_text_random_rotation: 0, // 默认不随机旋转
@@ -335,7 +336,7 @@ async function loadSettings() {
     settings.value.engine.movetime = (config.engine as any).movetime ?? 1000;
     settings.value.engine.depth = (config.engine as any).depth ?? 10;
     
-    settings.value.ui.board_texture = config.ui.board_texture || 'src/assets/textures/tx1/wood_diff_1k.jpg';
+    settings.value.ui.board_texture = config.ui.board_texture || 'textures/tx1/wood_diff_1k.jpg';
     settings.value.ui.opponent_text_direction = (config.ui as any).opponent_text_direction || 'down';
     settings.value.ui.piece_shape = (config.ui as any).piece_shape || 'cylinder';
     settings.value.ui.piece_text_random_rotation = (config.ui as any).piece_text_random_rotation ?? 0;
@@ -587,15 +588,14 @@ function validateAndSaveRotation() {
 async function selectEnginePath() {
   try {
     const selected = await open({
-      multiple: false,
       filters: [{
         name: 'Executable',
         extensions: ['exe']
       }]
     });
     
-    if (selected) {
-      settings.value.engine.pikafish_path = selected as string;
+    if (selected && typeof selected === 'string') {
+      settings.value.engine.pikafish_path = selected;
       await saveSettings();
     }
   } catch (error) {
@@ -606,8 +606,8 @@ async function selectEnginePath() {
 // 纹理切换
 function onTextureChange() {
   if (selectedTexture.value !== 'custom') {
-    // 构建纹理路径
-    settings.value.ui.board_texture = `src/assets/textures/${selectedTexture.value}/wood_diff_1k.jpg`;
+    // 构建纹理路径（新格式）
+    settings.value.ui.board_texture = `textures/${selectedTexture.value}/wood_diff_1k.jpg`;
     saveSettings();
   }
 }

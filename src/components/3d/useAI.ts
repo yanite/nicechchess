@@ -1,5 +1,5 @@
 import { ref } from 'vue';
-import { startEngine, getBestMove } from '../../services/engineService';
+import { startEngine, getBestMove, startEngineOutputListener } from '../../services/engineService';
 import { UCIToMove } from '../../logic/chess/constants';
 import { isValidMove } from '../../logic/chess/rules';
 import type { useChessStore } from '../../store/chessStore';
@@ -31,9 +31,13 @@ export function useAI(
     // 启动引擎（如果尚未启动）
     if (!engineStarted) {
       try {
+        // 启动引擎输出监听器
+        await startEngineOutputListener();
+        
         // 从配置中获取引擎路径
         const config = await import('../../services/configService').then(m => m.loadConfig());
         const enginePath = config.engine.pikafish_path;
+        console.log('启动引擎，路径:', enginePath);
         await startEngine(enginePath);
         engineStarted = true;
       } catch (error) {
@@ -47,10 +51,12 @@ export function useAI(
     try {
       // 获取当前局面的 FEN
       const fen = chessStore.fen;
+      console.log('[AI] 请求 AI 着法，FEN:', fen);
       
       // 请求 AI 最佳着法
       const skillLevel = chessStore.getCurrentPlayerAILevel();
       const config = chessStore.engineConfig;
+      console.log('[AI] 参数 - 深度:', config.depth, 'AI等级:', skillLevel);
       
       const bestMoveUCI = await getBestMove(
         fen, 
@@ -61,6 +67,8 @@ export function useAI(
         config.calculationMode, // 计算模式
         config.movetime         // 思考时间
       );
+      
+      console.log('[AI] 收到最佳着法:', bestMoveUCI);
       
       // 转换 UCI 着法为内部坐标
       const [fromRow, fromCol, toRow, toCol] = UCIToMove(bestMoveUCI);

@@ -4,8 +4,8 @@ import SettingsDialog from './components/SettingsDialog.vue';
 import NewGameDialog, { type NewGameConfig } from './components/NewGameDialog.vue';
 import GameNotationDialog from './components/GameNotationDialog.vue';
 import { useChessStore } from './store/chessStore';
-import { computed, ref, onMounted, onUnmounted } from 'vue';
-import { getCurrentWindow } from '@tauri-apps/api/window';
+import { computed, ref, onMounted } from 'vue';
+import { invoke } from '@tauri-apps/api/core';
 import { toast } from './utils/toast';
 
 const chessStore = useChessStore();
@@ -17,175 +17,20 @@ const showSettings = ref(false);
 const showNewGameDialog = ref(false);
 const showNotationDialog = ref(false);
 
-// 窗口状态管理
-const WINDOW_STATE_KEY = 'chchess_window_state';
-
-interface WindowState {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
-// 窗口尺寸和位置约束
-const MIN_WINDOW_SIZE = 400; // 最小窗口尺寸
-const DEFAULT_WINDOW_WIDTH = 1280;
-const DEFAULT_WINDOW_HEIGHT = 720;
-const DEFAULT_WINDOW_X = 100;
-const DEFAULT_WINDOW_Y = 100;
-
-/**
- * 验证并修正窗口状态，确保不会出现非法值
- */
-async function validateAndFixWindowState(state: WindowState): Promise<WindowState> {
-  const appWindow = getCurrentWindow();
-  
-  // 获取屏幕尺寸
-  let screenWidth = window.screen.width;
-  let screenHeight = window.screen.height;
-  
-  // 尝试获取更准确的屏幕工作区（排除任务栏）
-  try {
-    const currentMonitor = await appWindow.currentMonitor();
-    if (currentMonitor) {
-      screenWidth = currentMonitor.size.width;
-      screenHeight = currentMonitor.size.height;
-    }
-  } catch (error) {
-    // 忽略错误，使用默认屏幕尺寸
-  }
-  
-  let fixedState = { ...state };
-  
-  // 验证窗口大小
-  if (fixedState.width < MIN_WINDOW_SIZE) {
-    fixedState.width = DEFAULT_WINDOW_WIDTH;
-  }
-  
-  if (fixedState.height < MIN_WINDOW_SIZE) {
-    fixedState.height = DEFAULT_WINDOW_HEIGHT;
-  }
-  
-  // 限制窗口最大尺寸为屏幕尺寸
-  if (fixedState.width > screenWidth) {
-    fixedState.width = screenWidth - 50;
-  }
-  
-  if (fixedState.height > screenHeight) {
-    fixedState.height = screenHeight - 50;
-  }
-  
-  // 验证窗口位置
-  if (fixedState.x < 0 || fixedState.x >= screenWidth) {
-    fixedState.x = DEFAULT_WINDOW_X;
-  }
-  
-  if (fixedState.y < 0 || fixedState.y >= screenHeight) {
-    fixedState.y = DEFAULT_WINDOW_Y;
-  }
-  
-  // 确保窗口不会完全超出屏幕右侧或底部
-  if (fixedState.x + fixedState.width > screenWidth) {
-    fixedState.x = Math.max(0, screenWidth - fixedState.width - 10);
-  }
-  
-  if (fixedState.y + fixedState.height > screenHeight) {
-    fixedState.y = Math.max(0, screenHeight - fixedState.height - 10);
-  }
-  
-  return fixedState;
-}
-
-// 保存窗口状态到localStorage（带防抖）
-let saveTimeout: number | null = null;
-function saveWindowStateDebounced() {
-  if (saveTimeout) {
-    clearTimeout(saveTimeout);
-  }
-  
-  saveTimeout = window.setTimeout(async () => {
-    try {
-      const appWindow = getCurrentWindow();
-      const position = await appWindow.outerPosition();
-      const size = await appWindow.outerSize();
-      
-      const state: WindowState = {
-        x: position.x,
-        y: position.y,
-        width: size.width,
-        height: size.height,
-      };
-      
-      localStorage.setItem(WINDOW_STATE_KEY, JSON.stringify(state));
-    } catch (error) {
-      // 忽略保存错误
-    }
-  }, 500); // 500ms 防抖
-}
-
-// 恢复窗口状态
-async function restoreWindowState() {
-  try {
-    const saved = localStorage.getItem(WINDOW_STATE_KEY);
-    if (!saved) {
-      return;
-    }
-    
-    let state: WindowState = JSON.parse(saved);
-    
-    // 验证并修正窗口状态
-    state = await validateAndFixWindowState(state);
-    
-    const appWindow = getCurrentWindow();
-    
-    // 设置窗口位置（使用Tauri v2 PhysicalPosition）
-    try {
-      await appWindow.setPosition({ 
-        type: 'Physical',
-        x: Math.round(state.x), 
-        y: Math.round(state.y) 
-      });
-    } catch (posError) {
-      // 忽略设置位置错误
-    }
-    
-    // 设置窗口大小（使用Tauri v2 PhysicalSize）
-    try {
-      await appWindow.setSize({ 
-        type: 'Physical',
-        width: Math.round(state.width), 
-        height: Math.round(state.height) 
-      });
-    } catch (sizeError) {
-      // 忽略设置大小错误
-    }
-  } catch (error) {
-    // 忽略恢复状态错误
-  }
-}
-
-// 组件挂载时恢复窗口状态并监听事件
+// 组件挂载时初始化
 onMounted(async () => {
-  // 恢复窗口状态
-  await restoreWindowState();
-  
-  // 监听窗口移动和调整大小事件
-  const appWindow = getCurrentWindow();
-  
-  let unlistenMove: (() => void) | null = null;
-  let unlistenResize: (() => void) | null = null;
-  
-  try {
-    unlistenMove = await appWindow.onMoved(() => {
-      saveWindowStateDebounced();
-    });
-    
-    unlistenResize = await appWindow.onResized(() => {
-      saveWindowStateDebounced();
-    });
-  } catch (error) {
-    // 忽略注册监听器错误
-  }
+  // 监听全局键盘事件用于打开开发工具
+  document.addEventListener('keydown', async (event) => {
+    if ((event.ctrlKey && event.shiftKey && event.key === 'I') || event.key === 'F12') {
+      event.preventDefault();
+      try {
+        await invoke('open_devtools');
+        console.log('DevTools opened via keyboard shortcut');
+      } catch (error) {
+        console.error('Failed to open DevTools:', error);
+      }
+    }
+  });
   
   // 监听页面刷新/关闭事件，停止引擎
   window.addEventListener('beforeunload', async () => {
@@ -194,16 +39,6 @@ onMounted(async () => {
       await stopEngine();
     } catch (error) {
       // 忽略停止引擎错误
-    }
-  });
-  
-  // 在组件卸载时清理事件监听器
-  onUnmounted(() => {
-    if (unlistenMove) {
-      unlistenMove();
-    }
-    if (unlistenResize) {
-      unlistenResize();
     }
   });
 });
@@ -268,63 +103,63 @@ const moveHistoryText = computed(() => {
 
 /**
  * 点击着法时，跳转到该着法位置
+ * 使用带动画的跳转，animateJumpToMove 内部会处理状态更新和动画
  */
 async function jumpToMove(moveIndex: number | undefined) {
-  console.log('[App] ========== jumpToMove CALLED ==========', moveIndex);
+  console.log('[App] jumpToMove called with index:', moveIndex, 'current:', chessStore.currentMoveIndex);
   
   if (moveIndex === undefined) {
-    console.log('[App] moveIndex is undefined, returning');
     return;
   }
   
-  console.log('[App] jumpToMove called with index:', moveIndex, 'current:', chessStore.currentMoveIndex);
-  
-  // 调用 store 的方法跳转到指定着法
-  chessStore.jumpToMove(moveIndex);
-  
-  console.log('[App] After jumpToMove, currentMoveIndex:', chessStore.currentMoveIndex);
-  console.log('[App] Board at (7,4):', chessStore.board[7][4], 'Board at (7,7):', chessStore.board[7][7]);
-  
-  // 等待一小段时间确保 store 状态完全更新
-  await new Promise(resolve => setTimeout(resolve, 100));
-  
-  console.log('[App] Before sync, Board at (7,4):', chessStore.board[7][4], 'Board at (7,7):', chessStore.board[7][7]);
-  
-  // 同步 3D 棋盘状态（带动画）
-  if (boardRef.value && boardRef.value.animateSyncBoardState) {
-    await boardRef.value.animateSyncBoardState();
-  } else if (boardRef.value && boardRef.value.syncBoardState) {
-    // 降级方案：如果没有动画版本，使用普通同步
-    boardRef.value.syncBoardState();
+  // 如果有3D棋盘引用并且支持带动画跳转，使用动画跳转
+  // animateJumpToMove 内部会处理所有状态更新，不需要在这里调用 store
+  if (boardRef.value && boardRef.value.animateJumpToMove) {
+    await boardRef.value.animateJumpToMove(moveIndex);
+  } else {
+    // 降级方案：直接跳转并同步
+    chessStore.jumpToMove(moveIndex);
+    
+    // 等待一小段时间确保 store 状态完全更新
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    // 同步 3D 棋盘状态
+    if (boardRef.value && boardRef.value.syncBoardState) {
+      boardRef.value.syncBoardState();
+    }
   }
 }
 
 // 重置游戏
-function resetGame() {
-  chessStore.resetGame();
-}
+// function resetGame() {
+//   chessStore.resetGame();
+// }
 
 // 悔棋
 async function undoMove() {
-  const success = chessStore.undoMove();
-  if (success && boardRef.value) {
-    // 等待动画完成
-    await boardRef.value.animateSyncBoardState();
+  if (boardRef.value && boardRef.value.animateSyncBoardState) {
+    // 直接调用动画函数，内部会处理状态更新
+    await boardRef.value.animateSyncBoardState('undo');
     toast.info('已悔棋');
-  } else if (!success) {
-    toast.warning('无法悔棋：已回到初始状态');
+  } else {
+    const success = chessStore.undoMove();
+    if (!success) {
+      toast.warning('无法悔棋：已回到初始状态');
+    }
   }
 }
 
 // 重做（下一步）
 async function redoMove() {
-  const success = chessStore.redoMove();
-  if (success && boardRef.value) {
-    // 等待动画完成
-    await boardRef.value.animateSyncBoardState();
+  if (boardRef.value && boardRef.value.animateSyncBoardState) {
+    // 直接调用动画函数，内部会处理状态更新
+    await boardRef.value.animateSyncBoardState('redo');
     toast.info('已重做');
-  } else if (!success) {
-    toast.warning('无法重做：已在最新状态');
+  } else {
+    const success = chessStore.redoMove();
+    if (!success) {
+      toast.warning('无法重做：已在最新状态');
+    }
   }
 }
 
@@ -374,6 +209,13 @@ async function handleNotationImported() {
     await stopEngine();
   } catch (error) {
     // 忽略停止引擎错误
+  }
+  
+  // 同步 3D 棋盘状态（导入棋谱后需要重建棋子）
+  if (boardRef.value && boardRef.value.syncBoardState) {
+    // 等待一小段时间确保 store 状态完全更新
+    await new Promise(resolve => setTimeout(resolve, 100));
+    boardRef.value.syncBoardState();
   }
 }
 
@@ -505,11 +347,16 @@ function handleNewGame(config: NewGameConfig) {
 
       <!-- 右侧边栏：分析信息（预留） -->
       <aside class="sidebar right-sidebar">
-        <h3>局势分析</h3>
+        <h3>棋谱信息</h3>
         <div class="analysis-panel">
-          <p>引擎分析功能开发中...</p>
-          <!-- TODO: 添加实时胜率图表 -->
-          <!-- TODO: 添加引擎评估分数 -->
+          <div v-if="chessStore.notationInfo.title || chessStore.notationInfo.event" class="notation-info">
+            <p v-if="chessStore.notationInfo.title"><strong>标题:</strong> {{ chessStore.notationInfo.title }}</p>
+            <p v-if="chessStore.notationInfo.event"><strong>赛事:</strong> {{ chessStore.notationInfo.event }}</p>
+            <p v-if="chessStore.notationInfo.result"><strong>结果:</strong> {{ chessStore.notationInfo.result }}</p>
+            <p v-if="chessStore.notationInfo.source"><strong>来源:</strong> {{ chessStore.notationInfo.source }}</p>
+            <p><strong>着法数:</strong> {{ chessStore.moveHistory.length }}</p>
+          </div>
+          <p v-else class="no-info">暂无棋谱信息</p>
         </div>
       </aside>
     </main>
@@ -742,6 +589,22 @@ export default {
 }
 
 .analysis-panel p {
+  margin: 8px 0;
+  color: #333;
+  font-size: 14px;
+}
+
+.notation-info p {
+  text-align: left;
+  padding: 4px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.notation-info p:last-child {
+  border-bottom: none;
+}
+
+.no-info {
   color: #7f8c8d;
   text-align: center;
 }

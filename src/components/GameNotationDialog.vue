@@ -39,7 +39,7 @@
               </div>
               <div v-else-if="chessScores.length === 0" class="empty-hint">
                 暂无棋谱文件<br>
-                <small>请将 .txt 格式的棋谱文件放入 src/assets/chess_score 目录</small>
+                <small>请将 .txt 格式的棋谱文件放入 assets/chess_score 目录</small>
               </div>
               <div v-else class="score-list">
                 <div 

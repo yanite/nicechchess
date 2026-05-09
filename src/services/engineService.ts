@@ -1,4 +1,30 @@
 import { invoke } from '@tauri-apps/api/core';
+import { listen, UnlistenFn } from '@tauri-apps/api/event';
+
+let unlistenEngineOutput: UnlistenFn | null = null;
+
+/**
+ * 监听引擎输出并打印到控制台
+ */
+export async function startEngineOutputListener(): Promise<void> {
+  if (unlistenEngineOutput) {
+    return;
+  }
+  
+  unlistenEngineOutput = await listen<string>('engine-output', (event) => {
+    console.log(`[引擎] ${event.payload}`);
+  });
+}
+
+/**
+ * 停止监听引擎输出
+ */
+export function stopEngineOutputListener(): void {
+  if (unlistenEngineOutput) {
+    unlistenEngineOutput();
+    unlistenEngineOutput = null;
+  }
+}
 
 /**
  * 启动 Pikafish 引擎

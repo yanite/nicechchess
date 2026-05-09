@@ -5,37 +5,17 @@
  */
 
 import { useChessStore } from '../../store/chessStore';
-import type { Board, Player, GameStatus, MoveRecord } from '../../core/chess/types';
-import { getPieceColor } from '../../core/chess/constants';
+import type { GameStatus } from '../../core/chess/types';
 
 export function useGameAdapter() {
   const chessStore = useChessStore();
   
   // 转换函数：将 store 的数据格式转换为新类型
-  function convertBoard(): Board {
-    return chessStore.board.map(row => [...row]);
-  }
-  
-  function convertCurrentPlayer(): Player {
-    return chessStore.currentPlayer;
-  }
-  
   function convertStatus(): GameStatus {
     if (chessStore.gameStatus === 'finished') {
       return chessStore.winner ? 'checkmate' : 'stalemate';
     }
     return 'playing';
-  }
-  
-  function convertMoveHistory(): MoveRecord[] {
-    return chessStore.moveHistory.map(record => ({
-      from: { row: record.from[0], col: record.from[1] },
-      to: { row: record.to[0], col: record.to[1] },
-      piece: record.piece,
-      captured: record.captured,
-      timestamp: record.timestamp,
-      notation: record.chineseNotation,
-    }));
   }
   
   // 方法适配

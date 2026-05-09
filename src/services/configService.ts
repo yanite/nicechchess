@@ -50,7 +50,7 @@ const DEFAULT_CONFIG: AppConfig = {
     height: 720,
   },
   engine: {
-    pikafish_path: 'public/pikafish/pikafish-vnni512.exe',
+    pikafish_path: 'assets/pikafish/pikafish-vnni512.exe',
     threads: Math.max(1, Math.floor((typeof navigator !== 'undefined' && navigator.hardwareConcurrency) || 4) / 2),
     hash: 2048,
     calculation_mode: 'depth',
@@ -58,7 +58,7 @@ const DEFAULT_CONFIG: AppConfig = {
     depth: 20,
   },
   ui: {
-    board_texture: 'src/assets/textures/tx1/wood_diff_1k.jpg',
+    board_texture: 'assets/textures/tx1/wood_diff_1k.jpg',
     opponent_text_direction: 'down',
     piece_shape: 'cylinder',
     piece_text_random_rotation: 0, // 默认不随机旋转
@@ -77,6 +77,38 @@ const DEFAULT_CONFIG: AppConfig = {
 const CONFIG_KEY = 'chchess_config';
 
 /**
+ * 迁移旧路径配置到新的 assets/ 前缀格式
+ */
+function migrateConfigPaths(config: AppConfig): AppConfig {
+  const migrated = { ...config };
+  let changed = false;
+  
+  // 迁移引擎路径
+  if (config.engine.pikafish_path.startsWith('public/pikafish/')) {
+    migrated.engine = { ...config.engine };
+    migrated.engine.pikafish_path = config.engine.pikafish_path.replace('public/pikafish/', 'assets/pikafish/');
+    changed = true;
+  }
+  
+  // 迁移纹理路径 - 处理多种旧格式
+  if (config.ui.board_texture.startsWith('src/assets/')) {
+    migrated.ui = { ...config.ui };
+    migrated.ui.board_texture = config.ui.board_texture.replace('src/assets/', 'assets/');
+    changed = true;
+  } else if (config.ui.board_texture.startsWith('textures/')) {
+    migrated.ui = { ...config.ui };
+    migrated.ui.board_texture = 'assets/' + config.ui.board_texture;
+    changed = true;
+  }
+  
+  if (changed) {
+    console.log('[配置迁移] 旧路径已迁移到 assets/ 格式');
+  }
+  
+  return migrated;
+}
+
+/**
  * 加载配置（从localStorage）
  */
 export async function loadConfig(): Promise<AppConfig> {
@@ -84,14 +116,20 @@ export async function loadConfig(): Promise<AppConfig> {
     const saved = localStorage.getItem(CONFIG_KEY);
     if (saved) {
       const config = JSON.parse(saved);
-      // console.log('配置加载成功（本地存储）');
-      return { ...DEFAULT_CONFIG, ...config };
+      const mergedConfig = { ...DEFAULT_CONFIG, ...config };
+      // 迁移旧路径格式
+      const migratedConfig = migrateConfigPaths(mergedConfig);
+      if (JSON.stringify(migratedConfig) !== JSON.stringify(mergedConfig)) {
+        // 路径已迁移，保存更新后的配置
+        localStorage.setItem(CONFIG_KEY, JSON.stringify(migratedConfig));
+        console.log('[配置迁移] 已将旧路径迁移到 assets/ 格式');
+      }
+      return migratedConfig;
     }
   } catch (error) {
     console.error('加载配置失败:', error);
   }
   
-  // 返回默认配置
   return { ...DEFAULT_CONFIG };
 }
 

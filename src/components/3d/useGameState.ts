@@ -1,8 +1,8 @@
 import { ref } from 'vue';
 import { isInCheck, isValidMove } from '../../logic/chess/rules';
 import type { useChessStore } from '../../store/chessStore';
-import checkImage from '../../assets/将军.png';
-import checkmateImage from '../../assets/绝杀.png';
+import checkImage from '../../../assets/将军.png';
+import checkmateImage from '../../../assets/绝杀.png';
 
 /**
  * 游戏状态管理（将军/绝杀提示等）

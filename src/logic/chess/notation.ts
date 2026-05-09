@@ -7,6 +7,7 @@
  * 3. 着法生成（棋盘坐标 → 中文棋谱）
  * 4. 完整棋谱导入导出
  * 5. 智能识别文本是否为棋谱
+ * 6. ASCII棋盘图形解析
  */
 
 import { 
@@ -19,6 +20,211 @@ import {
   getPieceColor
 } from './constants';
 import { isValidMove } from './rules';
+
+// ==================== ASCII棋盘解析 ====================
+
+const BLACK_PIECE_MAP: Record<string, PieceType> = {
+  '将': PIECES.B_KING,
+  '車': PIECES.B_CAR, '车': PIECES.B_CAR,
+  '馬': PIECES.B_HORSE, '马': PIECES.B_HORSE,
+  '砲': PIECES.B_CANNON, '炮': PIECES.B_CANNON,
+  '士': PIECES.B_BISHOP,
+  '象': PIECES.B_ELEPHANT,
+  '卒': PIECES.B_PAWN,
+};
+
+const RED_PIECE_MAP: Record<string, PieceType> = {
+  '帅': PIECES.R_KING,
+  '俥': PIECES.R_CAR, '车': PIECES.R_CAR,
+  '傌': PIECES.R_HORSE, '马': PIECES.R_HORSE,
+  '炮': PIECES.R_CANNON,
+  '仕': PIECES.R_BISHOP, '士': PIECES.R_BISHOP,
+  '相': PIECES.R_ELEPHANT, '象': PIECES.R_ELEPHANT,
+  '兵': PIECES.R_PAWN,
+};
+
+export function parseASCIIBoard(text: string): Board | null {
+  console.log('[parseASCIIBoard] 开始解析ASCII棋盘');
+  
+  const lines = text.split(/\r?\n/);
+  
+  let blackSideLine = -1;
+  let redSideLine = -1;
+  
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+    if (/^黑\s*方$/.test(trimmed) || trimmed === '黑方') {
+      blackSideLine = i;
+    }
+    if (/^红\s*方$/.test(trimmed) || trimmed === '红方') {
+      redSideLine = i;
+    }
+  }
+  
+  if (blackSideLine === -1) {
+    console.error('[parseASCIIBoard] 错误：未找到"黑方"标记行');
+    return null;
+  }
+  if (redSideLine === -1) {
+    console.error('[parseASCIIBoard] 错误：未找到"红方"标记行');
+    return null;
+  }
+  if (blackSideLine >= redSideLine) {
+    console.error('[parseASCIIBoard] 错误："黑方"标记应在"红方"标记上方');
+    return null;
+  }
+  
+  console.log(`[parseASCIIBoard] 找到标记：黑方行=${blackSideLine}, 红方行=${redSideLine}`);
+  
+  let boardStartLine = -1;
+  let boardEndLine = -1;
+  
+  for (let i = blackSideLine + 1; i < redSideLine; i++) {
+    const line = lines[i];
+    if (line.includes('┌') || line.includes('┐') || line.includes('└') || line.includes('┘')) {
+      if (boardStartLine === -1) boardStartLine = i;
+      boardEndLine = i;
+    }
+  }
+  
+  if (boardStartLine === -1) {
+    console.error('[parseASCIIBoard] 错误：未找到棋盘边框字符（┌┐└┘）');
+    return null;
+  }
+  
+  console.log(`[parseASCIIBoard] 棋盘区域：${boardStartLine} - ${boardEndLine}`);
+  
+  const board: Board = Array.from({ length: BOARD_ROWS }, () =>
+    Array(BOARD_COLS).fill(PIECES.EMPTY)
+  );
+  
+  const allPieces: Array<{ row: number; col: number; piece: PieceType; char: string }> = [];
+  
+  let currentRow = 0;
+  
+  for (let lineIdx = boardStartLine; lineIdx <= boardEndLine && currentRow < BOARD_ROWS; lineIdx++) {
+    const line = lines[lineIdx];
+    
+    const isBoardLine = line.includes('┬') || line.includes('┼') || 
+                        line.includes('├') || line.includes('┤') || line.includes('┴') ||
+                        line.includes('└') || line.includes('┌') || line.includes('┐') || 
+                        line.includes('┘') || line.includes('[') || line.includes('(');
+    
+    if (!isBoardLine) {
+      continue;
+    }
+    
+    let col = 0;
+    let i = 0;
+    
+    while (i < line.length && col <= BOARD_COLS) {
+      const char = line[i];
+      
+      if (char === '┬' || char === '┼' || char === '├' || char === '┤' || char === '│' || char === '┴') {
+        col++;
+        i++;
+      } else if (char === '┌' || char === '┐' || char === '└' || char === '┘') {
+        col++;
+        i++;
+      } else if (char === '※') {
+        col++;
+        i++;
+      } else if (char === '[') {
+        const endIndex = line.indexOf(']', i);
+        if (endIndex === -1) {
+          console.error(`[parseASCIIBoard] 错误：行${lineIdx}位置${i}，方括号未闭合`);
+          return null;
+        }
+        const pieceChar = line.substring(i + 1, endIndex);
+        const piece = BLACK_PIECE_MAP[pieceChar];
+        if (piece === undefined) {
+          console.error(`[parseASCIIBoard] 错误：方括号内未知黑棋"${pieceChar}"`);
+          return null;
+        }
+        if (col >= 0 && col < BOARD_COLS) {
+          allPieces.push({ row: currentRow, col, piece, char: pieceChar });
+          console.log(`[parseASCIIBoard] 黑棋 [${pieceChar}] -> row=${currentRow}, col=${col}`);
+        }
+        col++;
+        i = endIndex + 1;
+      } else if (char === '(') {
+        const endIndex = line.indexOf(')', i);
+        if (endIndex === -1) {
+          console.error(`[parseASCIIBoard] 错误：行${lineIdx}位置${i}，圆括号未闭合`);
+          return null;
+        }
+        const pieceChar = line.substring(i + 1, endIndex);
+        const piece = RED_PIECE_MAP[pieceChar];
+        if (piece === undefined) {
+          console.error(`[parseASCIIBoard] 错误：圆括号内未知红棋"${pieceChar}"`);
+          return null;
+        }
+        if (col >= 0 && col < BOARD_COLS) {
+          allPieces.push({ row: currentRow, col, piece, char: pieceChar });
+          console.log(`[parseASCIIBoard] 红棋 (${pieceChar}) -> row=${currentRow}, col=${col}`);
+        }
+        col++;
+        i = endIndex + 1;
+      } else {
+        i++;
+      }
+    }
+    
+    currentRow++;
+  }
+  
+  if (currentRow !== BOARD_ROWS) {
+    console.error(`[parseASCIIBoard] 错误：解析行数不正确，期望${BOARD_ROWS}行，实际${currentRow}行`);
+    return null;
+  }
+  
+  const blackKing = allPieces.find(p => p.piece === PIECES.B_KING);
+  
+  if (blackKing) {
+    const validKingCols = [3, 4, 5];
+    if (!validKingCols.includes(blackKing.col)) {
+      const blackBishop = allPieces.find(p => p.piece === PIECES.B_BISHOP);
+      const blackElephant = allPieces.find(p => p.piece === PIECES.B_ELEPHANT);
+      
+      let colOffset = 0;
+      
+      if (blackBishop) {
+        const validBishopCols = [3, 5];
+        if (!validBishopCols.includes(blackBishop.col)) {
+          colOffset = 4 - blackKing.col;
+        }
+      } else if (blackElephant) {
+        const validElephantCols = [2, 6];
+        if (!validElephantCols.includes(blackElephant.col)) {
+          colOffset = 4 - blackKing.col;
+        }
+      } else {
+        colOffset = 4 - blackKing.col;
+      }
+      
+      if (colOffset !== 0) {
+        console.log(`[parseASCIIBoard] 黑将位置: col=${blackKing.col}, 偏移量=${colOffset}`);
+        console.log(`[parseASCIIBoard] 应用列偏移修正: ${colOffset}`);
+        allPieces.forEach(p => {
+          p.col += colOffset;
+          if (p.col < 0) p.col = 0;
+          if (p.col >= BOARD_COLS) p.col = BOARD_COLS - 1;
+        });
+      }
+    } else {
+      console.log(`[parseASCIIBoard] 黑将位置正确: col=${blackKing.col}`);
+    }
+  }
+  
+  for (const p of allPieces) {
+    if (p.row >= 0 && p.row < BOARD_ROWS && p.col >= 0 && p.col < BOARD_COLS) {
+      board[p.row][p.col] = p.piece;
+    }
+  }
+  
+  console.log('[parseASCIIBoard] 解析成功');
+  return board;
+}
 
 // ==================== 基础转换函数 ====================
 
@@ -214,7 +420,7 @@ function parseSpecialNotation(
     // 5字符格式：前车进三
     prefix = notation[0];
     pieceName = notation[1];
-    const _colPlaceholder = notation[2]; // 列号占位符，忽略
+    // notation[2] is column placeholder, ignored
     direction = notation[3] as '进' | '退' | '平';
     targetStr = notation[4];
   } else if (notation.length === 4) {
@@ -571,6 +777,8 @@ export function resolveMovePosition(
  */
 export interface GameNotation {
   metadata: string[];        // 元数据行
+  fen?: string;              // 初始局面 FEN（残局用）
+  asciiBoard?: Board;        // ASCII棋盘解析结果
   moves: Array<{             // 着法列表
     round: number;
     red?: string;            // 红方着法原文
@@ -584,14 +792,28 @@ export interface GameNotation {
  * @returns 解析结果，如果不是棋谱返回 null
  */
 export function parseGameNotation(text: string): GameNotation | null {
-  const lines = text.split('\n');
+  const lines = text.split(/\r?\n/);
   let metadataLines: string[] = [];
   let moveTextLines: string[] = [];
+  let fenLine: string | undefined;
+  let hasASCIIBoard = false;
   
-  // 分离元数据和着法行
   for (const line of lines) {
     const trimmed = line.trim();
     if (!trimmed) continue;
+    
+    if (/^(FEN|初始局面)\s*[:：]\s*(.+)/i.test(trimmed)) {
+      const match = trimmed.match(/^(?:FEN|初始局面)\s*[:：]\s*(.+)/i);
+      if (match) {
+        fenLine = match[1].trim();
+      }
+      metadataLines.push(line);
+      continue;
+    }
+    
+    if (/^\s*黑方\s*$/.test(line) || /^\s*红方\s*$/.test(line) || /[\[（][^\]）]+[\]）]/.test(line)) {
+      hasASCIIBoard = true;
+    }
     
     if (containsStandardMoves(trimmed)) {
       moveTextLines.push(line);
@@ -600,20 +822,34 @@ export function parseGameNotation(text: string): GameNotation | null {
     }
   }
   
-  // 如果没有找到着法，不是棋谱
-  if (moveTextLines.length === 0) {
+  if (moveTextLines.length === 0 && !hasASCIIBoard) {
     return null;
   }
   
-  // 解析着法序列
   const moves = parseMovesFromLines(moveTextLines);
   
-  if (moves.length === 0) {
+  if (moves.length === 0 && !hasASCIIBoard) {
     return null;
+  }
+  
+  let asciiBoard: Board | undefined;
+  if (hasASCIIBoard) {
+    console.log('[parseGameNotation] 检测到ASCII棋盘，尝试解析');
+    const parsedBoard = parseASCIIBoard(text);
+    if (parsedBoard) {
+      asciiBoard = parsedBoard;
+    } else {
+      console.log('[parseGameNotation] ASCII棋盘解析失败');
+      if (moves.length === 0) {
+        return null;
+      }
+    }
   }
   
   return {
     metadata: metadataLines,
+    fen: fenLine,
+    asciiBoard,
     moves
   };
 }
@@ -644,20 +880,37 @@ function cleanNotation(notation: string): string {
 function parseMovesFromLines(lines: string[]): Array<{ round: number; red?: string; black?: string }> {
   const moves: Array<{ round: number; red?: string; black?: string }> = [];
   
-  // 合并所有行，提取所有着法
-  const allText = lines.join(' ');
+  const allText = lines.join('\n');
   
-  // 正则匹配回合和着法
-  // 格式：数字. 着法 着法 或 数字. 着法
-  // 改进：允许着法中间有特殊标记（* m ! ? 等），使用更宽松的匹配
-  const roundRegex = /(\d+)\.\s*([^\d]+?)\s+(?:[*m!?\s]*\s*)([^\d]+?)(?:\s+[*m!?\s]*|\s*$)/g;
+  const halfwidthNum = (s: string) => s.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
+  const normalizedText = halfwidthNum(allText);
+  
+  // 红方着法：棋子名 + 中文数字列号 + 进退平 + 目标（可选）
+  // 支持：车二平五、兵九进一、前车进三、前炮平四
+  // 列号在"前/后"记谱法中可能省略
+  const redMovePattern = '[前后]?[帥帅俥車车傌馬马炮砲仕士相象兵卒將](?:[一二三四五六七八九])?[进退平][一二三四五六七八九]?';
+  // 黑方着法：棋子名 + 阿拉伯数字列号 + 进退平 + 目标（可选）
+  // 支持：马8进7、车9平8、前炮平4、前车进3
+  // 列号在"前/后"记谱法中可能省略
+  const blackMovePattern = '[前后]?[帥帅俥車车傌馬马炮砲仕士相象兵卒將将](?:[1-9])?[进退平][1-9]?';
+  
+  // 匹配完整回合：数字. 红方着法 黑方着法
+  const roundRegex = new RegExp(`(\\d+)\\.\\s*(${redMovePattern})\\s+(${blackMovePattern})`, 'g');
   
   let match;
-  while ((match = roundRegex.exec(allText)) !== null) {
+  let lastRound = 0;
+  while ((match = roundRegex.exec(normalizedText)) !== null) {
     const round = parseInt(match[1]);
-    // 清理着法中的特殊标记
     const redMove = cleanNotation(match[2].trim());
     const blackMove = cleanNotation(match[3].trim());
+    
+    // 检测回合号是否连续
+    if (round !== lastRound + 1) {
+      console.error(`[parseMovesFromLines] ❌ 回合号不连续: 期望 ${lastRound + 1}，实际 ${round}，可能缺少回合 ${lastRound + 1}`);
+    }
+    lastRound = round;
+    
+    console.log('[parseMovesFromLines] matched:', match[0], 'round:', round, 'red:', redMove, 'black:', blackMove);
     
     moves.push({
       round,
@@ -666,45 +919,20 @@ function parseMovesFromLines(lines: string[]): Array<{ round: number; red?: stri
     });
   }
   
-  // 如果没有匹配到双着法格式，尝试单着法格式
-  if (moves.length === 0) {
-    const singleMoveRegex = /(\d+)\.\s*([^\s\d]+)/g;
-    let currentRound = 0;
-    let lastRedMove: string | undefined;
+  // 匹配只有红方的回合
+  const singleRedRegex = new RegExp(`(\\d+)\\.\\s*(${redMovePattern})(?!\\s+${blackMovePattern})`, 'g');
+  while ((match = singleRedRegex.exec(normalizedText)) !== null) {
+    const round = parseInt(match[1]);
+    const redMove = cleanNotation(match[2].trim());
     
-    while ((match = singleMoveRegex.exec(allText)) !== null) {
-      const round = parseInt(match[1]);
-      // 清理着法中的特殊标记
-      const moveText = cleanNotation(match[2]);
-      
-      if (round !== currentRound) {
-        // 新回合
-        if (lastRedMove && currentRound > 0) {
-          // 保存上一回合的红方着法
-          const prevMove = moves.find(m => m.round === currentRound);
-          if (prevMove) {
-            prevMove.red = lastRedMove;
-          }
-        }
-        
-        currentRound = round;
-        lastRedMove = moveText;
-        moves.push({ round, red: undefined, black: undefined });
-      } else {
-        // 同回合的黑方着法
-        const currentMove = moves.find(m => m.round === round);
-        if (currentMove) {
-          currentMove.black = moveText;
-        }
-      }
-    }
-    
-    // 处理最后一个红方着法
-    if (lastRedMove && currentRound > 0) {
-      const lastMove = moves.find(m => m.round === currentRound);
-      if (lastMove) {
-        lastMove.red = lastRedMove;
-      }
+    // 检查是否已经存在该回合
+    if (!moves.find(m => m.round === round)) {
+      console.log('[parseMovesFromLines] single red matched:', match[0], 'round:', round, 'red:', redMove);
+      moves.push({
+        round,
+        red: redMove || undefined,
+        black: undefined
+      });
     }
   }
   
@@ -779,19 +1007,23 @@ export interface DetectedNotation {
  * @returns 检测结果
  */
 export function detectAndParseNotation(text: string): DetectedNotation {
-  const lines = text.split('\n');
+  const lines = text.split(/\r?\n/);
   let moveLines: string[] = [];
   let metadataLines: string[] = [];
   let totalMoves = 0;
+  let hasASCIIBoard = false;
   
   for (const line of lines) {
     const trimmed = line.trim();
     if (!trimmed) continue;
     
+    if (/^\s*黑方\s*$/.test(line) || /^\s*红方\s*$/.test(line) || /[\[（][^\]）]+[\]）]/.test(line)) {
+      hasASCIIBoard = true;
+    }
+    
     if (containsStandardMoves(trimmed)) {
       moveLines.push(line);
-      // 统计该行中的着法数量
-      const matches = trimmed.match(/[帥俥馬砲仕相兵將車馬砲士象卒][一二三四五六七八九1-9][进退平][一二三四五六七八九1-9]/g);
+      const matches = trimmed.match(/[帥俥馬砲仕相兵將車士象卒][一二三四五六七八九1-9１２３４５６７８９][进退平][^]*/g);
       if (matches) {
         totalMoves += matches.length;
       }
@@ -800,8 +1032,8 @@ export function detectAndParseNotation(text: string): DetectedNotation {
     }
   }
   
-  const isNotation = totalMoves > 0;
-  const confidence = Math.min(totalMoves / 4, 1.0); // 至少4个着法才高置信
+  const isNotation = totalMoves > 0 || hasASCIIBoard;
+  const confidence = hasASCIIBoard ? 1.0 : Math.min(totalMoves / 4, 1.0);
   
   const notationText = moveLines.join('\n');
   const parsed = isNotation ? (parseGameNotation(text) || undefined) : undefined;

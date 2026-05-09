@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import { 
   initBoard, 
   PIECES, 
+  PIECE_NAMES,
   type Board, 
   type PieceType,
   boardToUCI,
@@ -17,7 +18,6 @@ import {
   exportGameNotation,
   detectAndParseNotation
 } from '../logic/chess/notation';
-import { toast } from '../utils/toast';
 
 // 着法记录接口
 export interface MoveRecord {
@@ -75,6 +75,7 @@ export const useChessStore = defineStore('chess', () => {
   const isStudyMode = ref<boolean>(false);  // 研究模式（导入棋谱后启用）
   const redTime = ref(600);  // 默认每方 10 分钟
   const blackTime = ref(600);
+  const notationInfo = ref<{ title?: string; event?: string; result?: string; source?: string }>({});
   
   // 玩家配置（默认值）
   const blackPlayer = ref<PlayerConfig>({
@@ -195,15 +196,18 @@ export const useChessStore = defineStore('chess', () => {
     const lastMove = moveHistory.value[currentMoveIndex.value];
     if (!lastMove) return false;
     
-    // 恢复棋盘状态
     const { from, to, piece, captured } = lastMove;
+    
+    if (from[0] < 0 || from[1] < 0 || to[0] < 0 || to[1] < 0) {
+      console.log('[Store] 无法撤销：着法坐标无效', lastMove);
+      return false;
+    }
+    
     board.value[from[0]][from[1]] = piece;
     board.value[to[0]][to[1]] = captured || PIECES.EMPTY;
     
-    // 切换回上一个行棋方
     currentPlayer.value = currentPlayer.value === 'red' ? 'black' : 'red';
     
-    // 移动索引减1
     currentMoveIndex.value--;
     
     return true;
@@ -218,7 +222,6 @@ export const useChessStore = defineStore('chess', () => {
       return false;
     }
     
-    // 移动到下一个索引
     currentMoveIndex.value++;
     const nextMove = moveHistory.value[currentMoveIndex.value];
     
@@ -227,19 +230,23 @@ export const useChessStore = defineStore('chess', () => {
       return false;
     }
     
-    console.log('[Store] Redoing move:', nextMove);
-    console.log('[Store] Before redo - Board at', nextMove.from, ':', board.value[nextMove.from[0]][nextMove.from[1]]);
-    console.log('[Store] Before redo - Board at', nextMove.to, ':', board.value[nextMove.to[0]][nextMove.to[1]]);
-    
-    // 应用着法
     const { from, to, piece, captured } = nextMove;
+    
+    if (from[0] < 0 || from[1] < 0 || to[0] < 0 || to[1] < 0) {
+      console.log('[Store] 无法重做：着法坐标无效', nextMove);
+      currentMoveIndex.value--;
+      return false;
+    }
+    
+    console.log(`[Store] 重做着法: ${nextMove.chineseNotation}`);
+    console.log(`[Store] 移动棋子: ${PIECE_NAMES[piece] || '?'} 从 [${from[0]}][${from[1]}] 到 [${to[0]}][${to[1]}]`);
+    if (captured !== PIECES.EMPTY && captured) {
+      console.log(`[Store] 吃掉 ${PIECE_NAMES[captured]} 子, 坐标 [${to[0]}][${to[1]}]`);
+    }
+    
     board.value[from[0]][from[1]] = PIECES.EMPTY;
     board.value[to[0]][to[1]] = piece;
     
-    console.log('[Store] After redo - Board at', from, ':', board.value[from[0]][from[1]]);
-    console.log('[Store] After redo - Board at', to, ':', board.value[to[0]][to[1]]);
-    
-    // 切换行棋方
     currentPlayer.value = currentPlayer.value === 'red' ? 'black' : 'red';
     
     console.log('[Store] Redo completed successfully');
@@ -400,9 +407,86 @@ export const useChessStore = defineStore('chess', () => {
 
   /**
    * 从 FEN 串加载棋盘
+   * FEN 格式：position/position/.../position side_to_move - - 0 1
+   * position: 数字表示空格数，字母表示棋子（大写=红方，小写=黑方）
+   * K=帅, R=车, N=马, C=炮, A=仕, B=相, P=兵
+   * side_to_move: w=红方先手, b=黑方先手
    */
-  function loadFromFEN(fenString: string) {
-    // TODO: 实现 FEN 解析
+  function loadFromFEN(fenString: string): boolean {
+    try {
+      const parts = fenString.trim().split(' ');
+      const position = parts[0];
+      const sideToMove = parts[1] || 'w';
+      
+      const rows = position.split('/');
+      if (rows.length !== 10) {
+        console.error('FEN 格式错误：行数不是 10');
+        return false;
+      }
+      
+      // FEN 字符到棋子类型的映射
+      const fenCharToPiece: Record<string, PieceType> = {
+        'K': PIECES.R_KING,
+        'R': PIECES.R_CAR,
+        'N': PIECES.R_HORSE,
+        'C': PIECES.R_CANNON,
+        'A': PIECES.R_BISHOP,
+        'B': PIECES.R_ELEPHANT,
+        'P': PIECES.R_PAWN,
+        'k': PIECES.B_KING,
+        'r': PIECES.B_CAR,
+        'n': PIECES.B_HORSE,
+        'c': PIECES.B_CANNON,
+        'a': PIECES.B_BISHOP,
+        'b': PIECES.B_ELEPHANT,
+        'p': PIECES.B_PAWN,
+      };
+      
+      const newBoard: Board = Array.from({ length: BOARD_ROWS }, () =>
+        Array(BOARD_COLS).fill(PIECES.EMPTY)
+      );
+      
+      for (let row = 0; row < 10; row++) {
+        const rowStr = rows[row];
+        let col = 0;
+        
+        for (const char of rowStr) {
+          if (col >= BOARD_COLS) {
+            console.error(`FEN 格式错误：第 ${row} 行列数超过 9`);
+            return false;
+          }
+          
+          if (char >= '1' && char <= '9') {
+            // 数字表示空格数
+            const emptyCount = parseInt(char);
+            col += emptyCount;
+          } else {
+            // 棋子字符
+            const piece = fenCharToPiece[char];
+            if (piece === undefined) {
+              console.error(`FEN 格式错误：未知棋子字符 '${char}'`);
+              return false;
+            }
+            newBoard[row][col] = piece;
+            col++;
+          }
+        }
+        
+        if (col !== BOARD_COLS) {
+          console.error(`FEN 格式错误：第 ${row} 行列数不是 9（实际 ${col}）`);
+          return false;
+        }
+      }
+      
+      // 更新棋盘状态
+      board.value = newBoard;
+      currentPlayer.value = sideToMove === 'w' ? 'red' : 'black';
+      
+      return true;
+    } catch (error) {
+      console.error('FEN 解析失败:', error);
+      return false;
+    }
   }
 
   /**
@@ -454,63 +538,128 @@ export const useChessStore = defineStore('chess', () => {
       
       const notation = detected.parsed;
       
-      // 重置棋盘
+      // 解析元数据
+      notationInfo.value = {};
+      for (const line of notation.metadata) {
+        if (line.startsWith('标题:') || line.startsWith('Title:')) {
+          notationInfo.value.title = line.split(':')[1]?.trim();
+        } else if (line.startsWith('赛事:') || line.startsWith('Event:')) {
+          notationInfo.value.event = line.split(':')[1]?.trim();
+        } else if (line.startsWith('结果:') || line.startsWith('Result:')) {
+          notationInfo.value.result = line.split(':')[1]?.trim();
+        } else if (line.startsWith('来源网站:') || line.startsWith('Source:')) {
+          notationInfo.value.source = line.split(':')[1]?.trim();
+        }
+      }
+      
       resetGame();
       
-      // 统计执行情况
-      let successCount = 0;
-      let failCount = 0;
-      let failedMoves: Array<{round: number, color: string, move: string}> = [];
-      
-      // 逐步应用每一步着法（失败不中断）
-      // 注意：这里暂时关闭研究模式，以便 movePiece 能正常记录着法到 history
-      const wasStudyMode = isStudyMode.value;
-      isStudyMode.value = false;
-
-      for (const move of notation.moves) {
-        // 应用红方着法
-        if (move.red && currentPlayer.value === 'red') {
-          const success = applySingleMove(move.red);
-          if (success) {
-            successCount++;
-          } else {
-            failCount++;
-            failedMoves.push({ round: move.round, color: '红方', move: move.red });
-          }
-        }
-        
-        // 应用黑方着法
-        if (move.black && currentPlayer.value === 'black') {
-          const success = applySingleMove(move.black);
-          if (success) {
-            successCount++;
-          } else {
-            failCount++;
-            failedMoves.push({ round: move.round, color: '黑方', move: move.black });
-          }
+      if (notation.asciiBoard) {
+        console.log('[importNotation] 使用ASCII棋盘解析结果');
+        board.value = notation.asciiBoard;
+        currentPlayer.value = 'red';
+      } else if (notation.fen) {
+        console.log(`[importNotation] 检测到 FEN 初始局面: ${notation.fen}`);
+        const fenLoaded = loadFromFEN(notation.fen);
+        if (!fenLoaded) {
+          console.error('[importNotation] FEN 加载失败，使用标准开局');
         }
       }
       
-      // 显示执行结果摘要
-      if (failCount > 0) {
-        // 使用 Toast 提示
-        const failedMovesText = failedMoves.slice(0, 5).map(m => `${m.round}.${m.color}: ${m.move}`).join('\n');
-        const moreText = failCount > 5 ? `\n...还有 ${failCount - 5} 步` : '';
-        
-        toast.warning(
-          `棋谱导入完成！成功: ${successCount} 步，失败: ${failCount} 步。${failedMovesText}${moreText}`
-        );
-      }
-      
-      // 关键修复：将所有着法执行完毕后，重置 currentMoveIndex 到初始状态
-      // 这样用户可以按右键逐步查看着法
       currentMoveIndex.value = -1;
       
-      // 重置棋盘到初始状态
-      board.value = initBoard();
+      moveHistory.value = [];
+      
+      for (const move of notation.moves) {
+        if (move.red) {
+          const parsed = parseSingleMove(move.red, board.value);
+          let from: [number, number] = [-1, -1];
+          let to: [number, number] = [-1, -1];
+          let piece: PieceType = PIECES.EMPTY;
+          let captured: PieceType = PIECES.EMPTY;
+          
+          if (parsed) {
+            const position = resolveMovePosition(parsed, board.value, 'red');
+            if (position) {
+              from = [position[0], position[1]];
+              to = [position[2], position[3]];
+              piece = board.value[from[0]][from[1]];
+              captured = board.value[to[0]][to[1]];
+              
+              console.log(`[importNotation] 红方着法: ${move.red} - ${PIECE_NAMES[piece] || '?'} [${from[0]}][${from[1]}] → [${to[0]}][${to[1]}]`);
+              if (captured !== PIECES.EMPTY && captured) {
+                console.log(`[importNotation] 吃掉 ${PIECE_NAMES[captured]} 子, 坐标 [${to[0]}][${to[1]}]`);
+              }
+              
+              board.value[from[0]][from[1]] = PIECES.EMPTY;
+              board.value[to[0]][to[1]] = piece;
+              
+              moveHistory.value.push({
+                from,
+                to,
+                piece,
+                captured,
+                uci: '',
+                chineseNotation: move.red,
+                timestamp: Date.now()
+              });
+            } else {
+              console.error(`[importNotation] ❌ 红方着法解析失败: ${move.red} (无法解析位置)`);
+            }
+          } else {
+            console.error(`[importNotation] ❌ 红方着法解析失败: ${move.red} (无法解析着法)`);
+          }
+        }
+        if (move.black) {
+          const parsed = parseSingleMove(move.black, board.value);
+          let from: [number, number] = [-1, -1];
+          let to: [number, number] = [-1, -1];
+          let piece: PieceType = PIECES.EMPTY;
+          let captured: PieceType = PIECES.EMPTY;
+          
+          if (parsed) {
+            const position = resolveMovePosition(parsed, board.value, 'black');
+            if (position) {
+              from = [position[0], position[1]];
+              to = [position[2], position[3]];
+              piece = board.value[from[0]][from[1]];
+              captured = board.value[to[0]][to[1]];
+              
+              console.log(`[importNotation] 黑方着法: ${move.black} - ${PIECE_NAMES[piece] || '?'} [${from[0]}][${from[1]}] → [${to[0]}][${to[1]}]`);
+              if (captured !== PIECES.EMPTY && captured) {
+                console.log(`[importNotation] 吃掉 ${PIECE_NAMES[captured]} 子, 坐标 [${to[0]}][${to[1]}]`);
+              }
+              
+              board.value[from[0]][from[1]] = PIECES.EMPTY;
+              board.value[to[0]][to[1]] = piece;
+              
+              moveHistory.value.push({
+                from,
+                to,
+                piece,
+                captured,
+                uci: '',
+                chineseNotation: move.black,
+                timestamp: Date.now()
+              });
+            } else {
+              console.error(`[importNotation] ❌ 黑方着法解析失败: ${move.black} (无法解析位置)`);
+            }
+          } else {
+            console.error(`[importNotation] ❌ 黑方着法解析失败: ${move.black} (无法解析着法)`);
+          }
+        }
+      }
+      
+      if (notation.asciiBoard) {
+        board.value = notation.asciiBoard;
+      } else if (notation.fen) {
+        loadFromFEN(notation.fen);
+      } else {
+        board.value = initBoard();
+      }
       currentPlayer.value = 'red';
       
-      // 启用研究模式
       isStudyMode.value = true;
 
       console.log(`已启用研究模式，导入 ${moveHistory.value.length} 步着法，当前索引: ${currentMoveIndex.value}`);
@@ -523,40 +672,10 @@ export const useChessStore = defineStore('chess', () => {
   }
 
   /**
-   * 应用单个着法
-   * @param notationText 着法文本（如"炮二平五"）
-   * @returns 是否成功
-   */
-  function applySingleMove(notationText: string): boolean {
-    // 解析着法（不传 color，让 parseSingleMove 自动判断）
-    const parsed = parseSingleMove(notationText, board.value);
-    if (!parsed) {
-      return false;
-    }
-    
-    // 计算具体位置（使用解析出的实际颜色）
-    const isChineseNumber = /[一二三四五六七八九]/.test(notationText[1]);
-    const actualColor = isChineseNumber ? 'red' : 'black';
-    const position = resolveMovePosition(parsed, board.value, actualColor);
-    if (!position) {
-      return false;
-    }
-    
-    const [fromRow, fromCol, toRow, toCol] = position;
-    
-    // 执行移动（使用现有的 movePiece 方法）
-    const success = movePiece(fromRow, fromCol, toRow, toCol);
-    
-    return success;
-  }
-
-  /**
    * 获取当前棋谱的元数据（如果有）
    * @returns 元数据数组
    */
   function getNotationMetadata(): string[] {
-    // 注意：元数据只在导入时临时保存，不持久化到 store
-    // 如需持久化，可添加专门的字段
     return [];
   }
 
@@ -575,6 +694,7 @@ export const useChessStore = defineStore('chess', () => {
     blackPlayer,
     redPlayer,
     engineConfig,
+    notationInfo,
     
     // 计算属性
     fen,

@@ -21,7 +21,7 @@ import { isValidMove } from '../../logic/chess/rules';
 // 导入模块化功能
 import { useScene } from './useScene';
 import { createBoard, BOARD_WIDTH, BOARD_HEIGHT, CELL_SIZE } from './useBoard';
-import { createPieces, syncPiecesWithBoard, resetPiecePosition as resetPiecePositionFunc, loadChessFont, refreshPieceTextures, setCurrentFontName } from './usePieces';
+import { createPieces, syncPiecesWithBoard, resetPiecePosition as resetPiecePositionFunc, loadChessFont, refreshPieceTextures, setCurrentFontName, createPieceMesh } from './usePieces';
 import { useInteraction } from './useInteraction';
 import { useAI } from './useAI';
 import { useGameState } from './useGameState';
@@ -51,6 +51,10 @@ let lineMaterials: any[] = [];
 // 合法落点指示点
 let validMoveIndicators: THREE.Mesh[] = [];
 
+// 动画控制标志
+let shouldCancelAnimation = false;
+let currentAnimationPromise: Promise<void> | null = null;
+
 // 使用场景管理模块
 const sceneManager = useScene(container);
 
@@ -73,6 +77,7 @@ const currentAIPlayer = computed(() => {
 
 /**
  * 动画移动棋子（用于跳转着法时）
+ * 支持中止：当 shouldCancelAnimation 为 true 时立即完成动画
  */
 function animatePieceMove(piece: THREE.Mesh, fromRow: number, fromCol: number, toRow: number, toCol: number, duration: number = 500): Promise<void> {
   return new Promise((resolve) => {
@@ -90,13 +95,25 @@ function animatePieceMove(piece: THREE.Mesh, fromRow: number, fromCol: number, t
     const targetPos = {
       x: startX + toCol * CELL_SIZE,
       z: startZ + toRow * CELL_SIZE,
-      y: 0.01 // 棋盘平面高度
+      y: piece.position.y // 保持 Y 坐标不变
     };
     
     // 动画参数
     const startTime = Date.now();
     
     function animate() {
+      // 检查是否需要中止动画
+      if (shouldCancelAnimation) {
+        // 立即跳转到目标位置
+        piece.position.x = targetPos.x;
+        piece.position.z = targetPos.z;
+        // 更新棋子的 userData
+        (piece as any).userData.row = toRow;
+        (piece as any).userData.col = toCol;
+        resolve();
+        return;
+      }
+      
       const elapsed = Date.now() - startTime;
       const progress = Math.min(elapsed / duration, 1);
       
@@ -108,13 +125,13 @@ function animatePieceMove(piece: THREE.Mesh, fromRow: number, fromCol: number, t
       // 更新位置
       piece.position.x = startPos.x + (targetPos.x - startPos.x) * eased;
       piece.position.z = startPos.z + (targetPos.z - startPos.z) * eased;
-      piece.position.y = startPos.y + (targetPos.y - startPos.y) * eased;
       
       if (progress < 1) {
         requestAnimationFrame(animate);
       } else {
-        // 动画完成，恢复正确的y坐标
-        resetPiecePositionFunc(piece, currentPieceShape);
+        // 动画完成，更新棋子的 userData
+        (piece as any).userData.row = toRow;
+        (piece as any).userData.col = toCol;
         resolve();
       }
     }
@@ -165,10 +182,16 @@ async function initScene() {
   if (!container.value) return;
 
   // 加载配置
-  let boardTexturePath = 'src/assets/textures/tx1.jpg';
+  let boardTexturePath = 'assets/textures/tx1/wood_diff_1k.jpg';
   try {
     const config = await loadConfig();
-    boardTexturePath = config.ui.board_texture;
+    const texturePath = config.ui.board_texture;
+    // 确保路径包含 assets/ 前缀
+    if (texturePath.startsWith('assets/')) {
+      boardTexturePath = texturePath;
+    } else if (texturePath.includes('textures/')) {
+      boardTexturePath = 'assets/' + texturePath;
+    }
     currentPieceShape = config.ui.piece_shape || 'cylinder';
     opponentTextDirection = config.ui.opponent_text_direction || 'down';
     pieceTextRandomRotation = (config.ui as any).piece_text_random_rotation ?? 0;
@@ -198,10 +221,10 @@ async function initScene() {
   let internalFontName = 'KaiTi'; // Canvas使用的内部字体名称
   
   if (fontName === '隶书') {
-    fontPath = 'assets/fonts/隶书.ttf';
+    fontPath = 'assets/fonts/sys/隶书.ttf';
     internalFontName = 'LiSu';
   } else if (fontName === '中國龍豪行書') {
-    fontPath = 'assets/fonts/中國龍豪行書.TTF';
+    fontPath = 'assets/fonts/sys/中國龍豪行書.ttf';
     internalFontName = 'HAKUYOOTI3500';
   } else {
     // 系统楷体，不加载自定义字体
@@ -224,7 +247,7 @@ async function initScene() {
   // setupLights 已在 initScene 中调用
 
   // 创建棋盘
-  boardGroup = createBoard(scene, boardTexturePath, container.value, lineMaterials);
+  boardGroup = await createBoard(scene, boardTexturePath, container.value, lineMaterials);
 
   // 创建棋子
   // ✅ 关键修复：直接使用chessStore.board确保获取最新的响应式数据
@@ -274,14 +297,11 @@ async function initScene() {
 async function reloadBoardTexture(texturePath: string) {
   if (!scene || !boardGroup) return;
   
-  const startX = -((BOARD_WIDTH - 1) * CELL_SIZE) / 2;
-  const startZ = -((BOARD_HEIGHT - 1) * CELL_SIZE) / 2;
-  
   // 移除旧的棋盘
   scene.remove(boardGroup);
   
   // 创建新的棋盘
-  boardGroup = createBoard(scene, texturePath, container.value, lineMaterials);
+  boardGroup = await createBoard(scene, texturePath, container.value, lineMaterials);
 }
 
 /**
@@ -298,109 +318,272 @@ function updatePieceShape(shape: 'cylinder' | 'standard') {
  * 同步棋盘状态（无动画）
  */
 function syncBoardState() {
-  console.log('[ChessBoard3D] syncBoardState called');
-  
-  // ✅ 关键修复：直接使用chessStore.board确保获取最新的响应式数据
   const board = chessStore.board;
-  
   syncPiecesWithBoard(piecesGroup, scene, board, currentPieceShape, opponentTextDirection, pieceTextRandomRotation);
 }
 
-/**
- * 同步棋盘状态（带动画）- 简化版本，直接重建所有棋子
- */
-async function animateSyncBoardState() {
-  console.log('[ChessBoard3D] animateSyncBoardState called');
+async function animateSyncBoardState(direction: 'redo' | 'undo' = 'redo') {
+  if (currentAnimationPromise) {
+    shouldCancelAnimation = true;
+    await currentAnimationPromise;
+    shouldCancelAnimation = false;
+  }
   
-  // ✅ 关键修复：直接使用chessStore.board确保获取最新的响应式数据
-  const board = chessStore.board;
-  
-  // 获取当前着法索引
-  const moveIndex = chessStore.currentMoveIndex;
   const moveHistory = chessStore.moveHistory;
   
-  console.log('[ChessBoard3D] currentMoveIndex:', moveIndex, 'moveHistory length:', moveHistory.length);
+  // 如果没有着法记录，直接同步
+  if (moveHistory.length === 0) {
+    syncPiecesWithBoard(piecesGroup, scene, chessStore.board, currentPieceShape, opponentTextDirection, pieceTextRandomRotation);
+    return;
+  }
   
-  if (moveIndex >= 0 && moveIndex < moveHistory.length) {
-    const moveRecord = moveHistory[moveIndex];
-    console.log('[ChessBoard3D] Processing move:', moveRecord);
+  // 检查是否可以继续
+  if (direction === 'redo' && chessStore.currentMoveIndex >= moveHistory.length - 1) {
+    return;
+  }
+  if (direction === 'undo' && chessStore.currentMoveIndex < 0) {
+    return;
+  }
+  
+  // 根据方向获取需要动画的着法记录
+  let moveRecord: typeof moveHistory[0];
+  let animFromRow: number, animFromCol: number, animToRow: number, animToCol: number;
+  let pieceType: number;
+  
+  if (direction === 'redo') {
+    // 重做：获取下一步的着法记录
+    const nextIndex = chessStore.currentMoveIndex + 1;
+    moveRecord = moveHistory[nextIndex];
+    pieceType = moveRecord.piece;
+    animFromRow = moveRecord.from[0];
+    animFromCol = moveRecord.from[1];
+    animToRow = moveRecord.to[0];
+    animToCol = moveRecord.to[1];
+  } else {
+    // 悔棋：获取当前步的着法记录
+    const currentIndex = chessStore.currentMoveIndex;
+    moveRecord = moveHistory[currentIndex];
+    pieceType = moveRecord.piece;
+    animFromRow = moveRecord.to[0];
+    animFromCol = moveRecord.to[1];
+    animToRow = moveRecord.from[0];
+    animToCol = moveRecord.from[1];
+  }
+  
+  // 找到需要移动的棋子
+  let pieceMesh: THREE.Mesh | undefined;
+  for (const child of piecesGroup.children) {
+    if (child instanceof THREE.Mesh) {
+      const userData = (child as any).userData;
+      if (userData.piece === pieceType && !userData.isCaptured) {
+        if (userData.row === animFromRow && userData.col === animFromCol) {
+          pieceMesh = child;
+          break;
+        }
+      }
+    }
+  }
+  
+  if (pieceMesh) {
+    // 执行动画
+    currentAnimationPromise = animatePieceMove(pieceMesh, animFromRow, animFromCol, animToRow, animToCol, 300);
+    await currentAnimationPromise;
+    currentAnimationPromise = null;
     
-    const [fromRow, fromCol] = moveRecord.from;
-    const [toRow, toCol] = moveRecord.to;
-    const pieceType = moveRecord.piece;
+    // 更新棋子的 userData（动画可能已经更新过了，这里确保更新）
+    (pieceMesh as any).userData.row = animToRow;
+    (pieceMesh as any).userData.col = animToCol;
     
-    console.log('[ChessBoard3D] Board state at target position:', board[toRow][toCol]);
-    console.log('[ChessBoard3D] Board state at source position:', board[fromRow][fromCol]);
+    // 处理被吃的棋子
+    if (direction === 'redo' && moveRecord.captured !== 0) {
+      // 找到被吃的棋子并移除
+      for (const child of piecesGroup.children) {
+        if (child instanceof THREE.Mesh && child !== pieceMesh) {
+          const userData = (child as any).userData;
+          if (userData.row === animToRow && userData.col === animToCol && !userData.isCaptured) {
+            piecesGroup.remove(child);
+            child.geometry.dispose();
+            if (Array.isArray(child.material)) {
+              child.material.forEach((mat: THREE.Material) => mat.dispose());
+            } else {
+              (child.material as THREE.Material).dispose();
+            }
+            break;
+          }
+        }
+      }
+    } else if (direction === 'undo' && moveRecord.captured !== 0 && moveRecord.captured) {
+      const capturedPiece = moveRecord.captured;
+      const startX = -((BOARD_WIDTH - 1) * CELL_SIZE) / 2;
+      const startZ = -((BOARD_HEIGHT - 1) * CELL_SIZE) / 2;
+      
+      const capturedMesh = createPieceMesh(capturedPiece, animFromRow, animFromCol, currentPieceShape, opponentTextDirection, pieceTextRandomRotation);
+      capturedMesh.position.x = startX + animFromCol * CELL_SIZE;
+      capturedMesh.position.z = startZ + animFromRow * CELL_SIZE;
+      piecesGroup.add(capturedMesh);
+    }
     
-    // ✅ 关键修复：遍历所有棋子，找到需要移动的棋子
-    // 不再依赖 fromRow/fromCol，而是根据 board 状态和当前棋子位置来判断
+    if (direction === 'redo') {
+      chessStore.redoMove();
+    } else {
+      chessStore.undoMove();
+    }
+  } else {
+    if (direction === 'redo') {
+      chessStore.redoMove();
+    } else {
+      chessStore.undoMove();
+    }
+    syncPiecesWithBoard(piecesGroup, scene, chessStore.board, currentPieceShape, opponentTextDirection, pieceTextRandomRotation);
+  }
+}
+
+async function animateJumpToMove(targetIndex: number) {
+  if (currentAnimationPromise) {
+    shouldCancelAnimation = true;
+    await currentAnimationPromise;
+    shouldCancelAnimation = false;
+  }
+  
+  const currentIndex = chessStore.currentMoveIndex;
+  const moveHistory = chessStore.moveHistory;
+  
+  if (targetIndex < 0 || targetIndex > moveHistory.length - 1) {
+    return;
+  }
+  
+  if (targetIndex === currentIndex) {
+    return;
+  }
+  
+  const steps = Math.abs(targetIndex - currentIndex);
+  const direction = targetIndex > currentIndex ? 'forward' : 'backward';
+  
+  for (let step = 0; step < steps; step++) {
+    if (shouldCancelAnimation) {
+      return;
+    }
+    
+    let moveRecord: typeof moveHistory[0];
+    let animFromRow: number, animFromCol: number, animToRow: number, animToCol: number;
+    let pieceType: number;
+    
+    if (direction === 'forward') {
+      // 前进：获取下一步的着法记录
+      const nextIndex = currentIndex + step + 1;
+      moveRecord = moveHistory[nextIndex];
+      pieceType = moveRecord.piece;
+      animFromRow = moveRecord.from[0];
+      animFromCol = moveRecord.from[1];
+      animToRow = moveRecord.to[0];
+      animToCol = moveRecord.to[1];
+    } else {
+      // 后退：获取当前步的着法记录
+      const currentStepIndex = currentIndex - step;
+      moveRecord = moveHistory[currentStepIndex];
+      pieceType = moveRecord.piece;
+      animFromRow = moveRecord.to[0];
+      animFromCol = moveRecord.to[1];
+      animToRow = moveRecord.from[0];
+      animToCol = moveRecord.from[1];
+    }
+    
+    // 找到需要移动的棋子
     let pieceMesh: THREE.Mesh | undefined;
-    let actualFromRow = -1;
-    let actualFromCol = -1;
-    
     for (const child of piecesGroup.children) {
       if (child instanceof THREE.Mesh) {
         const userData = (child as any).userData;
-        // 查找与 moveRecord 匹配的棋子（类型相同且未被吃掉）
         if (userData.piece === pieceType && !userData.isCaptured) {
-          // 检查这个棋子是否应该移动（即它现在在 fromRow/fromCol 或 toRow/toCol）
-          if ((userData.row === fromRow && userData.col === fromCol) ||
-              (userData.row === toRow && userData.col === toCol)) {
+          if (userData.row === animFromRow && userData.col === animFromCol) {
             pieceMesh = child;
-            actualFromRow = userData.row;
-            actualFromCol = userData.col;
             break;
           }
         }
       }
     }
     
-    if (!pieceMesh) {
-      console.log('[ChessBoard3D] Piece not found, falling back to full sync');
-      // 降级方案：直接同步
-      syncPiecesWithBoard(piecesGroup, scene, board, currentPieceShape, opponentTextDirection, pieceTextRandomRotation);
+    if (pieceMesh) {
+      currentAnimationPromise = animatePieceMove(pieceMesh, animFromRow, animFromCol, animToRow, animToCol, 300);
+      await currentAnimationPromise;
+      currentAnimationPromise = null;
+      
+      if (shouldCancelAnimation) {
+        return;
+      }
+      
+      (pieceMesh as any).userData.row = animToRow;
+      (pieceMesh as any).userData.col = animToCol;
+      
+      if (direction === 'forward' && moveRecord.captured !== 0) {
+        for (const child of piecesGroup.children) {
+          if (child instanceof THREE.Mesh && child !== pieceMesh) {
+            const userData = (child as any).userData;
+            if (userData.row === animToRow && userData.col === animToCol && !userData.isCaptured) {
+              piecesGroup.remove(child);
+              child.geometry.dispose();
+              if (Array.isArray(child.material)) {
+                child.material.forEach((mat: THREE.Material) => mat.dispose());
+              } else {
+                (child.material as THREE.Material).dispose();
+              }
+              break;
+            }
+          }
+        }
+      } else if (direction === 'backward' && moveRecord.captured !== 0 && moveRecord.captured) {
+        const capturedPiece = moveRecord.captured;
+        const startX = -((BOARD_WIDTH - 1) * CELL_SIZE) / 2;
+        const startZ = -((BOARD_HEIGHT - 1) * CELL_SIZE) / 2;
+        
+        const capturedMesh = createPieceMesh(capturedPiece, animFromRow, animFromCol, currentPieceShape, opponentTextDirection, pieceTextRandomRotation);
+        capturedMesh.position.x = startX + animFromCol * CELL_SIZE;
+        capturedMesh.position.z = startZ + animFromRow * CELL_SIZE;
+        piecesGroup.add(capturedMesh);
+      }
+      
+      if (direction === 'forward') {
+        chessStore.redoMove();
+      } else {
+        chessStore.undoMove();
+      }
+    } else {
+      chessStore.jumpToMove(targetIndex);
+      syncPiecesWithBoard(piecesGroup, scene, chessStore.board, currentPieceShape, opponentTextDirection, pieceTextRandomRotation);
       return;
     }
-    
-    console.log('[ChessBoard3D] Found piece at', actualFromRow, actualFromCol, 'moving to', toRow, toCol);
-    
-    const startX = -((BOARD_WIDTH - 1) * CELL_SIZE) / 2;
-    const startZ = -((BOARD_HEIGHT - 1) * CELL_SIZE) / 2;
-    
-    // 保存目标位置的引用
-    const sourceX = startX + actualFromCol * CELL_SIZE;
-    const sourceZ = startZ + actualFromRow * CELL_SIZE;
-    
-    // 先设置棋子到起始位置
-    pieceMesh.position.x = sourceX;
-    pieceMesh.position.z = sourceZ;
-    
-    // ✅ 执行动画
-    const duration = 400;
-    await animatePieceMove(pieceMesh, actualFromRow, actualFromCol, toRow, toCol, duration);
-    
-    console.log('[ChessBoard3D] After animation - position:', pieceMesh.position.x, pieceMesh.position.z);
-    
-    // ✅ 关键修复：动画完成后，手动更新棋子的 userData，不重建场景
-    (pieceMesh as any).userData.row = toRow;
-    (pieceMesh as any).userData.col = toCol;
-    
-    console.log('[ChessBoard3D] Updated userData to row:', toRow, 'col:', toCol);
-    
-    // ✅ 处理被吃掉的棋子（如果有）
-    if (moveRecord.captured !== undefined && moveRecord.captured !== 0) {
-      console.log('[ChessBoard3D] Captured piece detected, syncing all pieces');
-      // 如果有棋子被吃掉，需要同步所有棋子
-      syncPiecesWithBoard(piecesGroup, scene, board, currentPieceShape, opponentTextDirection, pieceTextRandomRotation);
-    }
-    
-    console.log('[ChessBoard3D] animateSyncBoardState finished');
-  } else {
-    console.log('[ChessBoard3D] No valid moveIndex, doing full sync');
-    // 没有着法记录，直接同步
-    syncPiecesWithBoard(piecesGroup, scene, board, currentPieceShape, opponentTextDirection, pieceTextRandomRotation);
   }
 }
+
+// 添加一个简单的动画函数，用于在棋谱导航时展示移动效果
+// async function animateMoveForNavigation(fromRow: number, fromCol: number, toRow: number, toCol: number) {
+//   // 根据起始位置和目标位置找到对应的棋子
+//   const startX = -((BOARD_WIDTH - 1) * CELL_SIZE) / 2;
+//   const startZ = -((BOARD_HEIGHT - 1) * CELL_SIZE) / 2;
+//   
+//   // 找到需要移动的棋子
+//   let pieceMesh: THREE.Mesh | undefined;
+//   for (const child of piecesGroup.children) {
+//     if (child instanceof THREE.Mesh) {
+//       const userData = (child as any).userData;
+//       if (userData.row === fromRow && userData.col === fromCol) {
+//         pieceMesh = child;
+//         break;
+//       }
+//     }
+//   }
+//   
+//   if (pieceMesh) {
+//     // 执行动画
+//     const duration = 400;
+//     await animatePieceMove(pieceMesh, fromRow, fromCol, toRow, toCol, duration);
+//     
+//     // 更新棋子的 userData
+//     (pieceMesh as any).userData.row = toRow;
+//     (pieceMesh as any).userData.col = toCol;
+//   } else {
+//     console.log('[ChessBoard3D] animateMoveForNavigation: piece not found at', fromRow, fromCol);
+//   }
+// }
 
 /**
  * 显示合法落点指示器
@@ -479,22 +662,22 @@ function clearValidMoves() {
 /**
  * 获取棋子名称
  */
-function getPieceName(pieceType: number): string {
-  if (pieceType > 0) {
-    // 红方
-    const redPieces: Record<number, string> = {
-      1: '帅', 2: '仕', 3: '相', 4: '马', 5: '车', 6: '炮', 7: '兵'
-    };
-    return redPieces[pieceType] || '';
-  } else {
-    // 黑方（负数）
-    const absType = Math.abs(pieceType);
-    const blackPieces: Record<number, string> = {
-      1: '将', 2: '士', 3: '象', 4: '马', 5: '车', 6: '炮', 7: '卒'
-    };
-    return blackPieces[absType] || '';
-  }
-}
+// function getPieceName(pieceType: number): string {
+//   if (pieceType > 0) {
+//     // 红方
+//     const redPieces: Record<number, string> = {
+//       1: '帅', 2: '仕', 3: '相', 4: '马', 5: '车', 6: '炮', 7: '兵'
+//     };
+//     return redPieces[pieceType] || '';
+//   } else {
+//     // 黑方（负数）
+//     const absType = Math.abs(pieceType);
+//     const blackPieces: Record<number, string> = {
+//       1: '将', 2: '士', 3: '象', 4: '马', 5: '车', 6: '炮', 7: '卒'
+//     };
+//     return blackPieces[absType] || '';
+//   }
+// }
 
 // 监听棋盘状态变化，同步3D视图
 // 注意：不再监听 chessStore.board 的变化
@@ -575,7 +758,7 @@ window.addEventListener('storage', handleStorageChange);
 // 监听currentPlayer变化，自动触发AI行棋
 watch(
   () => gameAdapter.currentPlayer,
-  (newPlayer, oldPlayer) => {
+  () => {
     // 如果新玩家是AI且不在研究模式，延迟触发AI行棋
     if (!gameAdapter.getIsStudyMode() && gameAdapter.isCurrentPlayerAI()) {
       setTimeout(() => {
@@ -608,10 +791,10 @@ onMounted(() => {
       if (aiModule) {
         aiModule.setEngineStarted(true);
       }
-    }).catch(error => {
+    }).catch(() => {
       // 启动 AI 引擎失败
     });
-  }).catch(error => {
+  }).catch(() => {
     // 即使配置加载失败，也启用交互（使用默认配置）
     isConfigReady.value = true;
   });
@@ -648,26 +831,16 @@ onMounted(() => {
       return;
     }
     
-    // 左右方向键导航（悔棋/重做）
+    // 左右方向键导航（悔棋/重做）- 直接调用动画函数
     if (event.key === 'ArrowLeft') {
       event.preventDefault();
-      const success = gameAdapter.undo();
-      if (success) {
-        // 延迟一小段时间确保 store 状态已更新，再同步 3D 场景
-        setTimeout(() => {
-          animateSyncBoardState();
-        }, 50);
-      }
+      // 直接调用动画函数，内部会处理状态更新
+      animateSyncBoardState('undo');
       return;
     } else if (event.key === 'ArrowRight') {
       event.preventDefault();
-      const success = gameAdapter.redo();
-      if (success) {
-        // 延迟一小段时间确保 store 状态已更新，再同步 3D 场景
-        setTimeout(() => {
-          animateSyncBoardState();
-        }, 50);
-      }
+      // 直接调用动画函数，内部会处理状态更新
+      animateSyncBoardState('redo');
       return;
     }
     
@@ -695,6 +868,7 @@ defineExpose({
   updatePieceShape,
   syncBoardState,
   animateSyncBoardState,  // 新增：带动画的同步
+  animateJumpToMove,      // 新增：带动画的跳转
   triggerAIMove: () => aiModule?.triggerAIMove()
 });
 

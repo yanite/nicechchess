@@ -4,6 +4,8 @@ import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js';
 import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js';
 import { getFontString } from './usePieces';
+import { convertFileSrc } from '@tauri-apps/api/core';
+import { invoke } from '@tauri-apps/api/core';
 
 // 棋盘尺寸配置
 export const BOARD_WIDTH = 9;
@@ -11,6 +13,24 @@ export const BOARD_HEIGHT = 10;
 export const CELL_SIZE = 1;
 export const BOARD_MARGIN_X = 0.5; // 左右边界
 export const BOARD_MARGIN_Z = 1.0; // 上下边界（一个棋子尺寸）
+
+/**
+ * 获取资源 URL（支持开发和生产环境）
+ * 通过 Rust 后端获取资源文件的绝对路径，再转换为 asset:// URL
+ */
+async function getAssetUrl(relativePath: string): Promise<string> {
+  try {
+    const absPath: string = await invoke('get_asset_path', { relativePath });
+    console.log('[资源加载] Rust 返回绝对路径:', absPath);
+    
+    const url = convertFileSrc(absPath);
+    console.log('[资源加载] asset URL:', url);
+    return url;
+  } catch (error) {
+    console.error('[资源加载] get_asset_path 失败:', error);
+    return relativePath;
+  }
+}
 
 /**
  * 创建粗线（使用 Line2）
@@ -120,12 +140,12 @@ function shouldUseWhiteLines(texturePath: string): boolean {
 /**
  * 创建棋盘
  */
-export function createBoard(
+export async function createBoard(
   scene: THREE.Scene,
   texturePath: string,
   container: HTMLDivElement | null,
   lineMaterials: any[]
-): THREE.Group {
+): Promise<THREE.Group> {
   // 清空之前的 LineMaterial 引用
   lineMaterials.length = 0;
   
@@ -149,7 +169,7 @@ export function createBoard(
   
   // 尝试加载纹理，如果失败则使用默认颜色
   try {
-    // console.log('尝试加载棋盘纹理:', texturePath);
+    console.log('[资源加载] 读取纹理资源 "' + texturePath + '"');
     
     // 从路径中提取基础名称（不含扩展名和目录）
     const basePath = texturePath.replace(/\.(jpg|jpeg|png)$/i, '');
@@ -158,11 +178,16 @@ export function createBoard(
     const normalMapPath = basePath + '_nor_gl_1k.exr';
     const roughnessMapPath = basePath + '_rough_1k.exr';
     
+    // 转换为可访问的 URL（异步）
+    const diffuseUrl = await getAssetUrl(texturePath);
+    const normalMapUrl = await getAssetUrl(normalMapPath);
+    const roughnessMapUrl = await getAssetUrl(roughnessMapPath);
+    
     // 加载基础颜色贴图（JPG/PNG）
     const diffuseTexture = textureLoader.load(
-      texturePath,
+      diffuseUrl,
       (loadedTexture) => {
-        console.log('棋盘颜色贴图加载成功:', texturePath);
+        console.log('[资源加载] ✓ 棋盘颜色贴图加载成功');
         loadedTexture.wrapS = THREE.RepeatWrapping;
         loadedTexture.wrapT = THREE.RepeatWrapping;
         loadedTexture.repeat.set(1, 1);
@@ -171,7 +196,7 @@ export function createBoard(
       },
       undefined,
       (error) => {
-        console.warn('棋盘颜色贴图加载失败，使用默认木纹颜色:', error);
+        console.warn('[资源加载] ✗ 棋盘颜色贴图加载失败，使用默认木纹颜色:', error);
         // 降级到默认木纹颜色
         boardMaterial = new THREE.MeshStandardMaterial({ 
           color: 0xDEB887,  // 实木色
@@ -189,30 +214,30 @@ export function createBoard(
     
     // 异步加载法线贴图（EXR格式）
     exrLoader.load(
-      normalMapPath,
+      normalMapUrl,
       (normalTexture) => {
-        console.log('法线贴图加载成功:', normalMapPath);
+        console.log('[资源加载] ✓ 法线贴图加载成功');
         boardMaterial.normalMap = normalTexture;
         boardMaterial.normalScale = new THREE.Vector2(1, 1);
         boardMaterial.needsUpdate = true;
       },
       undefined,
-      (error) => {
-        console.warn('法线贴图加载失败，跳过:', normalMapPath, error);
+      () => {
+        console.warn('[资源加载] ✗ 法线贴图加载失败，跳过');
       }
     );
     
     // 异步加载粗糙度贴图（EXR格式）
     exrLoader.load(
-      roughnessMapPath,
+      roughnessMapUrl,
       (roughnessTexture) => {
-        console.log('粗糙度贴图加载成功:', roughnessMapPath);
+        console.log('[资源加载] ✓ 粗糙度贴图加载成功');
         boardMaterial.roughnessMap = roughnessTexture;
         boardMaterial.needsUpdate = true;
       },
       undefined,
-      (error) => {
-        console.warn('粗糙度贴图加载失败，跳过:', roughnessMapPath, error);
+      () => {
+        console.warn('[资源加载] ✗ 粗糙度贴图加载失败，跳过');
       }
     );
     
@@ -552,10 +577,12 @@ function drawNumberLabels(
   const labelColor = useWhiteLines ? '#FFFFFF' : '#000000';
   
   // 绘制红方数字（在棋盘下方，row=9 的外侧）
+  // 红方从右到左：九八七六五四三二一
   const redLabelZ = startZ + (BOARD_HEIGHT - 1) * CELL_SIZE + labelOffset;
   for (let col = 0; col < BOARD_WIDTH; col++) {
     const xPos = startX + col * CELL_SIZE;
-    const texture = createLabelTextTexture(chineseNumbers[col], labelColor);
+    // 红方列号：col 0 对应"九"，col 8 对应"一"
+    const texture = createLabelTextTexture(chineseNumbers[BOARD_WIDTH - 1 - col], labelColor);
     if (!texture) continue;
     
     const labelGeometry = new THREE.PlaneGeometry(CELL_SIZE * 0.6, CELL_SIZE * 0.6);

@@ -7,11 +7,19 @@
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "build:portable": "tauri build",
+    "build:nsis": "tauri build -- --bundles nsis",
+    "build:msi": "tauri build -- --bundles msi",
+    "build:all": "tauri build"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-dialog": "^2",
     "@tauri-apps/plugin-opener": "^2",
+    "@tauri-apps/plugin-window-state": "^2",
     "@types/three": "^0.184.0",
     "pinia": "^3.0.4",
     "three": "^0.184.0",

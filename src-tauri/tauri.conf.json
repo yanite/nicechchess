@@ -12,24 +12,23 @@
   "app": {
     "windows": [
       {
-        "title": "tauri-app",
+        "title": "雅弈象棋",
         "width": 800,
-        "height": 600
+        "height": 600,
+        "devtools": true,
+        "visible": false
       }
     ],
     "security": {
-      "csp": "default-src 'self'; connect-src 'self' asset: https://asset.localhost",
+      "csp": null,
       "assetProtocol": {
         "enable": true,
-        "scope": [
-          "$RESOURCE/**"
-        ]
+        "scope": ["**"]
       }
     }
   },
   "bundle": {
-    "active": true,
-    "targets": "all",
+    "active": false,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -38,9 +37,7 @@
       "icons/icon.ico"
     ],
     "resources": [
-      "../src/assets/fonts/**/*"
+      "../assets/**/*"
     ]
-  }
-
-  
+  }  
 }

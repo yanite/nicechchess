@@ -295,8 +295,8 @@ function validateBasicMove(
  */
 function validateCapture(
   board: Board,
-  fromRow: number,
-  fromCol: number,
+  _fromRow: number,
+  _fromCol: number,
   toRow: number,
   toCol: number,
   piece: PieceType
@@ -362,8 +362,6 @@ function validateCheckRule(
         reason: `${moverColor === 'red' ? '红方' : '黑方'}正在被将军，此着法无法解将` 
       };
     }
-    
-    console.log(`✅ 此着法成功解将`);
   }
 
   return { valid: true };
@@ -486,41 +484,35 @@ export function isValidMove(
   }
 
   const pieceName = PIECE_NAMES[piece] || '?';
-  console.log(`\n🔍 开始验证移动：${pieceName} (${fromRow},${fromCol}) → (${toRow},${toCol})`);
 
   // 第一层：基础移动规则
   const basicResult = validateBasicMove(board, fromRow, fromCol, toRow, toCol, piece);
   if (!basicResult.valid) {
-    console.log(`❌ 第一层验证失败（基础移动规则）：${basicResult.reason}`);
+    console.log(`❌ ${pieceName} (${fromRow},${fromCol}) → (${toRow},${toCol}) 失败：${basicResult.reason}`);
     return false;
   }
-  console.log('✅ 第一层验证通过（基础移动规则）');
 
   // 第二层：吃子规则和叫将规则
   const captureResult = validateCapture(board, fromRow, fromCol, toRow, toCol, piece);
   if (!captureResult.valid) {
-    console.log(`❌ 第二层验证失败（吃子规则）：${captureResult.reason}`);
+    console.log(`❌ ${pieceName} (${fromRow},${fromCol}) → (${toRow},${toCol}) 失败：${captureResult.reason}`);
     return false;
   }
-  console.log('✅ 第二层验证通过（吃子规则）');
 
   // 第二层扩展：检查是否叫将且无法解将
   const checkResult = validateCheckRule(board, fromRow, fromCol, toRow, toCol, piece);
   if (!checkResult.valid) {
-    console.log(`❌ 第二层验证失败（叫将规则）：${checkResult.reason}`);
+    console.log(`❌ ${pieceName} (${fromRow},${fromCol}) → (${toRow},${toCol}) 失败：${checkResult.reason}`);
     return false;
   }
-  console.log('✅ 第二层验证通过（叫将规则）');
 
   // 第三层：高级规则
   const advancedResult = validateAdvancedRules(board, fromRow, fromCol, toRow, toCol, piece);
   if (!advancedResult.valid) {
-    console.log(`❌ 第三层验证失败（高级规则）：${advancedResult.reason}`);
+    console.log(`❌ ${pieceName} (${fromRow},${fromCol}) → (${toRow},${toCol}) 失败：${advancedResult.reason}`);
     return false;
   }
-  console.log('✅ 第三层验证通过（高级规则）');
 
-  console.log(`✅ 移动验证通过：${pieceName} (${fromRow},${fromCol}) → (${toRow},${toCol})\n`);
   return true;
 }
 

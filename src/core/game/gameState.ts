@@ -153,7 +153,7 @@ export class GameState {
     return '';
   }
   
-  loadFromFEN(fen: string): void {
+  loadFromFEN(_fen: string): void {
     // TODO: 实现FEN解析
     this.notifyObservers();
   }

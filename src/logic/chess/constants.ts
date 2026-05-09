@@ -188,7 +188,7 @@ function colToDisplayText(col: number, color: 'red' | 'black'): string {
  * @returns 中文着法字符串，如 "俥一进二"（红方）或 "车1进1"（黑方）
  */
 export function generateChineseNotation(
-  board: Board,
+  _board: Board,
   fromRow: number,
   fromCol: number,
   toRow: number,
